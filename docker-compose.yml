@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: angkasara
+      POSTGRES_PASSWORD: angkasara
+      POSTGRES_DB: angkasara
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U angkasara -d angkasara"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # di produksi (VPS) ganti host db & rahasia lewat .env / secret
+      DATABASE_URL: "postgresql://angkasara:angkasara@db:5432/angkasara?schema=public"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-ganti-di-produksi-min-32-karakter}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
+      STUDENT_SESSION_SECRET: "${STUDENT_SESSION_SECRET:-ganti-di-produksi-min-32-karakter}"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

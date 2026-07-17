@@ -1,0 +1,190 @@
+// AngkaSara — skema Prisma. Sumber kebenaran: plans/schema.md.
+// SEMENTARA memakai SQLite untuk dev lokal (Docker/Postgres belum bisa di mesin ini).
+//   Lihat buglog SQLITE-01 untuk cara kembali ke PostgreSQL saat produksi.
+// Tabel Better Auth (user/account/session/verification) ditambah lewat
+//   npx @better-auth/cli generate  (saat langkah Auth), lalu di-migrate.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  // Prisma 7: URL pindah ke prisma.config.ts; runtime pakai driver adapter (better-sqlite3). Lihat buglog PRISMA7-01 & SQLITE-01.
+}
+
+// CATATAN SQLite: Prisma tidak mendukung `enum` maupun `Json` di SQLite, jadi field
+// enum dijadikan String dengan nilai kanonik (divalidasi di layer aplikasi via Zod),
+// dan Json disimpan sebagai String (JSON.stringify/parse manual). Nilai enum sah:
+//   Tingkat: "X" | "XI" | "XII"
+//   Domain: "NUMERASI" | "LITERASI"
+//   Role: "ADMIN" | "GURU"
+//   PassageSource: "CHECKPOINT" | "SKIBACA"
+
+model Jurusan {
+  id     String  @id @default(cuid())
+  kode   String  @unique
+  nama   String
+  icon   String
+  urutan Int     @default(0)
+  kelas  Kelas[]
+}
+
+model Kelas {
+  id        String    @id @default(cuid())
+  tingkat   String // enum Tingkat: X | XI | XII
+  jurusan   Jurusan   @relation(fields: [jurusanId], references: [id])
+  jurusanId String
+  rombel    Int
+  label     String    @unique // "XI TKJ 2"
+  students  Student[]
+
+  @@unique([tingkat, jurusanId, rombel])
+}
+
+model Student {
+  id          String             @id @default(cuid())
+  nisn        String             @unique
+  nama        String
+  kelas       Kelas              @relation(fields: [kelasId], references: [id])
+  kelasId     String
+  aktif       Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  activities  PracticeActivity[]
+  checkpoints CheckpointResult[]
+
+  @@index([kelasId])
+}
+
+// ── Better Auth (staf: email+password, RBAC lewat field `role` di User) ──
+// Tabel di bawah adalah skema inti Better Auth (user/session/account/verification)
+// ditulis manual (CLI generate rewel dgn Prisma 7 driver-adapter + output kustom).
+// `role` adalah additionalField Better Auth (lihat src/lib/auth.ts). Nilai: "ADMIN" | "GURU".
+// Staff lama dihapus — identitas staf = User Better Auth ini (name+email+role).
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          String    @default("GURU") // additionalField: ADMIN | GURU
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+model PracticeActivity {
+  id         String   @id @default(cuid())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId  String
+  kelasLabel String // snapshot saat kejadian
+  domain     String // enum Domain: NUMERASI | LITERASI
+  category   String
+  level      String
+  activity   String
+  score      Int
+  wpm        Int?
+  stars      Int?
+  points     Int?
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([studentId, createdAt])
+  @@index([kelasLabel, createdAt])
+}
+
+model CheckpointResult {
+  id          String    @id @default(cuid())
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  kelasLabel  String
+  period      String // "YYYY-MM"
+  seed        Int
+  numerasi    Int
+  literasi    Int
+  total       Int
+  benarNum    Int
+  totalNum    Int
+  benarLit    Int
+  totalLit    Int
+  durasiDetik Int
+  waktuHabis  Boolean   @default(false)
+  payload     String? // JSON string (SQLite tak dukung Json native)
+  status      String    @default("submitted") // in_progress | submitted
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  @@unique([studentId, period]) // kunci 1x/bulan
+  @@index([kelasLabel, period])
+}
+
+model ReadingPassage {
+  id        String            @id @default(cuid())
+  kode      String            @unique
+  tema      String
+  title     String
+  text      String
+  source    String            @default("CHECKPOINT") // enum PassageSource: CHECKPOINT | SKIBACA
+  aktif     Boolean           @default(true)
+  questions ReadingQuestion[]
+}
+
+model ReadingQuestion {
+  id          String         @id @default(cuid())
+  passage     ReadingPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId   String
+  urutan      Int
+  q           String
+  options     String // JSON string: string[4] (urutan kanonik). SQLite tak dukung Json.
+  answerIndex Int // index kunci di options
+
+  @@index([passageId])
+}
