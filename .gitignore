@@ -1,0 +1,15 @@
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+# env & secrets
+.env
+.env*.local
+# prisma
+prisma/*.db
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+coverage/
