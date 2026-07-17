@@ -100,7 +100,7 @@ export default function SkibacaClient({ jurusanAwal }: { jurusanAwal: JurusanRin
             key={j.kode}
             disabled={pending}
             onClick={() => bukaJurusan(j.kode)}
-            className="flex items-center gap-3 rounded-2xl border border-black/10 p-4 text-left transition-colors hover:border-amber-400 hover:bg-amber-50/40 disabled:opacity-50 dark:border-white/15 dark:hover:border-amber-700 dark:hover:bg-amber-950/20"
+            className="as-lift as-pop flex items-center gap-3 rounded-2xl border border-black/10 bg-white/60 p-4 text-left disabled:opacity-50 dark:border-white/15 dark:bg-white/5"
           >
             <span className="text-3xl">{j.icon}</span>
             <div className="min-w-0 flex-1">
@@ -295,7 +295,7 @@ function BacaBacaan({
         </div>
         <button
           onClick={mulaiKuis}
-          className="w-full rounded-lg bg-amber-600 py-3 font-semibold text-white hover:bg-amber-700"
+          className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 py-3 font-bold text-white shadow-lg shadow-orange-500/25 transition-transform hover:scale-[1.02]"
         >
           Selesai membaca, mulai kuis ✅
         </button>
@@ -306,13 +306,21 @@ function BacaBacaan({
   if (fase === "hasil" && hasil) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl border border-black/10 p-6 text-center dark:border-white/15">
+        <div className="as-pop rounded-3xl border border-black/5 bg-gradient-to-b from-amber-50 to-transparent p-6 text-center shadow-lg dark:border-white/10 dark:from-amber-950/30">
+          <div className="text-5xl as-float">{hasil.percent >= 90 ? "🏆" : hasil.percent >= 70 ? "🎉" : "🌱"}</div>
           <div
-            className="mx-auto w-fit rounded-full px-5 py-2 text-sm font-bold text-white"
+            className="mx-auto mt-2 w-fit rounded-full px-5 py-2 text-sm font-bold text-white shadow"
             style={{ backgroundColor: hasil.badge.color }}
           >
             {hasil.badge.text}
           </div>
+          <p className="mt-2 text-sm font-semibold text-zinc-500">
+            {hasil.percent >= 90
+              ? "Luar biasa! Pemahamanmu hebat."
+              : hasil.percent >= 70
+                ? "Bagus! Terus tingkatkan, ya."
+                : "Jangan menyerah — baca lagi dan coba lagi!"}
+          </p>
           <div className="mt-4 grid grid-cols-3 gap-3">
             <Stat label="Skor" nilai={`${hasil.percent}%`} />
             <Stat label="Benar" nilai={`${hasil.benar}/${hasil.total}`} />
@@ -352,7 +360,7 @@ function BacaBacaan({
 
         <button
           onClick={onKeluar}
-          className="w-full rounded-lg bg-amber-600 py-3 font-semibold text-white hover:bg-amber-700"
+          className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 py-3 font-bold text-white shadow-lg shadow-orange-500/25 transition-transform hover:scale-[1.02]"
         >
           ← Kembali ke daftar bacaan
         </button>
@@ -399,9 +407,9 @@ function BacaBacaan({
       <button
         onClick={kirim}
         disabled={pending}
-        className="w-full rounded-lg bg-green-600 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3 font-bold text-white shadow-lg shadow-green-600/25 transition-transform hover:scale-[1.02] disabled:scale-100 disabled:opacity-50"
       >
-        {pending ? "Menilai…" : "Kumpulkan jawaban"}
+        {pending ? "Menilai…" : "Kumpulkan jawaban ✅"}
       </button>
       <p className="text-center text-xs text-zinc-400">{belum} soal belum dijawab</p>
     </div>
@@ -410,8 +418,8 @@ function BacaBacaan({
 
 function Stat({ label, nilai }: { label: string; nilai: string }) {
   return (
-    <div className="rounded-xl border border-black/10 p-3 text-center dark:border-white/15">
-      <div className="text-lg font-bold">{nilai}</div>
+    <div className="rounded-2xl border border-black/5 bg-white/70 p-3 text-center shadow-sm dark:border-white/10 dark:bg-white/10">
+      <div className="text-lg font-black">{nilai}</div>
       <div className="text-xs text-zinc-500">{label}</div>
     </div>
   );

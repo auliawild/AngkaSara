@@ -14,18 +14,26 @@ export default function MasukForm() {
   const [tab, setTab] = useState<Tab>(params.get("tab") === "staf" ? "staf" : "siswa");
 
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/15 dark:bg-zinc-900">
+    <div className="as-pop w-full max-w-sm rounded-3xl border border-black/5 bg-white/80 p-6 shadow-xl shadow-violet-500/10 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/80">
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">AngkaSara</h1>
+        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-3xl shadow-lg shadow-violet-600/30 as-float">
+          🎓
+        </div>
+        <h1 className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-3xl font-black tracking-tight text-transparent">
+          AngkaSara
+        </h1>
         <p className="mt-1 text-sm text-zinc-500">Literasi &amp; Numerasi · SMKN 1 Badegan</p>
+        <p className="mt-2 text-sm font-semibold text-violet-600 dark:text-violet-300">
+          Ayo belajar & tingkatkan kemampuanmu! ✨
+        </p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+      <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
         <TabBtn active={tab === "siswa"} onClick={() => setTab("siswa")}>
-          Siswa
+          🧑‍🎓 Siswa
         </TabBtn>
         <TabBtn active={tab === "staf"} onClick={() => setTab("staf")}>
-          Guru / Staf
+          🧑‍🏫 Guru / Staf
         </TabBtn>
       </div>
 
@@ -86,15 +94,15 @@ function SiswaForm({ next, router }: FormProps) {
         value={nisn}
         onChange={(e) => setNisn(e.target.value.replace(/\D/g, ""))}
         placeholder="Masukkan NISN"
-        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-blue-500 dark:border-white/20"
+        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
         disabled={loading || nisn.length < 4}
-        className="mt-2 rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        className="mt-2 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 py-2.5 font-bold text-white shadow-lg shadow-violet-600/25 transition-transform hover:scale-[1.02] disabled:scale-100 disabled:opacity-50"
       >
-        {loading ? "Memeriksa…" : "Masuk sebagai Siswa"}
+        {loading ? "Memeriksa…" : "Masuk sebagai Siswa 🚀"}
       </button>
       <p className="text-center text-xs text-zinc-400">Tanpa kata sandi — cukup NISN dari guru.</p>
     </form>
@@ -133,7 +141,7 @@ function StafForm({ next, router }: FormProps) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="nama@sekolah.sch.id"
-        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-blue-500 dark:border-white/20"
+        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
       />
       <label className="text-sm font-medium" htmlFor="password">
         Kata sandi
@@ -145,7 +153,7 @@ function StafForm({ next, router }: FormProps) {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="••••••••"
-        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-blue-500 dark:border-white/20"
+        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button

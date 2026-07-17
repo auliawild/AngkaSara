@@ -157,9 +157,9 @@ export default function SkibaClient({ awal }: { awal: SkibaData }) {
               setMode(m);
             }}
             className={
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
+              "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors " +
               (mode === m || (mode === "arena" && m === "hub")
-                ? "bg-blue-600 text-white"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-teal-600/25"
                 : "border border-black/15 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10")
             }
           >
@@ -221,7 +221,7 @@ function Hub({
               sfx().click();
               onPilihArena();
             }}
-            className="flex items-center gap-3 rounded-2xl border border-black/10 p-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
+            className="as-lift as-pop flex items-center gap-3 rounded-2xl border border-black/10 bg-white/60 p-4 text-left dark:border-white/15 dark:bg-white/5"
           >
             <span className="text-3xl">{t.icon}</span>
             <div className="min-w-0 flex-1">
@@ -263,9 +263,19 @@ function Hub({
 
 function Stat({ label, nilai }: { label: string; nilai: string }) {
   return (
-    <div className="rounded-xl border border-black/10 p-3 text-center dark:border-white/15">
-      <div className="text-xl font-bold">{nilai}</div>
+    <div className="rounded-2xl border border-black/5 bg-gradient-to-br from-black/[.03] to-transparent p-3 text-center shadow-sm dark:border-white/10 dark:from-white/[.06]">
+      <div className="text-xl font-black">{nilai}</div>
       <div className="text-xs text-zinc-500">{label}</div>
+    </div>
+  );
+}
+
+/** Kartu statistik untuk di atas latar gradien (teks putih). */
+function StatGlass({ label, nilai }: { label: string; nilai: string }) {
+  return (
+    <div className="rounded-2xl bg-white/20 px-2 py-2.5 text-center backdrop-blur">
+      <div className="text-lg font-black leading-none">{nilai}</div>
+      <div className="mt-1 text-[10px] font-medium leading-tight text-white/80">{label}</div>
     </div>
   );
 }
@@ -349,22 +359,31 @@ function Arena({
 
   if (fase === "hasil" && hasil) {
     return (
-      <div className="rounded-2xl border border-black/10 p-6 text-center dark:border-white/15">
-        <div className="text-4xl">{"⭐".repeat(hasil.bintang) + "☆".repeat(3 - hasil.bintang)}</div>
-        <p className="mt-1 text-sm font-semibold text-zinc-500">
+      <div
+        className={
+          "as-pop rounded-3xl p-6 text-center text-white shadow-xl " +
+          (hasil.bintang === 3
+            ? "bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 shadow-orange-500/25"
+            : hasil.bintang === 2
+              ? "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-teal-600/25"
+              : "bg-gradient-to-br from-slate-500 to-slate-700 shadow-slate-700/20")
+        }
+      >
+        <div className="text-5xl as-float">{"⭐".repeat(hasil.bintang) + "☆".repeat(3 - hasil.bintang)}</div>
+        <p className="mt-2 text-sm font-bold text-white/90">
           {hasil.bintang === 3
             ? "Sempurna! Penguasaan sangat baik 🎉"
             : hasil.bintang === 2
               ? "Bagus! Sedikit lagi menuju sempurna 💪"
               : "Terus berlatih, kamu pasti bisa! 🌱"}
         </p>
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <Stat label="Poin" nilai={hasil.points.toLocaleString("id-ID")} />
-          <Stat label="Benar" nilai={`${hasil.benar}/${hasil.total}`} />
-          <Stat label="Combo" nilai={`x${hasil.bestCombo}`} />
+        <div className="mt-4 grid grid-cols-3 gap-2.5">
+          <StatGlass label="Poin" nilai={hasil.points.toLocaleString("id-ID")} />
+          <StatGlass label="Benar" nilai={`${hasil.benar}/${hasil.total}`} />
+          <StatGlass label="Combo" nilai={`x${hasil.bestCombo}`} />
         </div>
         {hasil.unlockNext && (
-          <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-300">
+          <p className="mt-4 rounded-xl bg-white/20 px-3 py-2 text-sm font-bold ring-1 ring-white/30">
             🔓 Level {hasil.unlockNext} terbuka untuk {hasil.topicName}!
           </p>
         )}
@@ -374,13 +393,13 @@ function Arena({
               setFase("pilih");
               setHasil(null);
             }}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="rounded-full bg-white px-6 py-2.5 text-sm font-bold text-zinc-800 shadow transition-transform hover:scale-105"
           >
             🎮 Main lagi
           </button>
           <button
             onClick={onKeluar}
-            className="rounded-lg border border-black/15 px-5 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+            className="rounded-full bg-white/20 px-5 py-2.5 text-sm font-semibold ring-1 ring-white/40 backdrop-blur transition-colors hover:bg-white/30"
           >
             ← Kembali ke topik
           </button>
@@ -474,7 +493,7 @@ function Arena({
         <button
           onClick={mulai}
           disabled={!topicId || !level || pending}
-          className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+          className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-teal-600/25 transition-transform hover:scale-105 disabled:scale-100 disabled:opacity-40"
         >
           {pending ? "Menyiapkan…" : "▶️ MULAI PERMAINAN"}
         </button>
@@ -552,9 +571,9 @@ function Diagnostik({
 
   if (fase === "hasil" && hasil) {
     return (
-      <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
-        <h2 className="text-center text-xl font-bold">📊 Hasil Tes Diagnostik</h2>
-        <div className="mx-auto mt-3 w-fit rounded-full px-5 py-2 text-sm font-bold text-white" style={{ backgroundColor: levelColor(hasil.levelRata) }}>
+      <div className="as-pop rounded-3xl border border-black/5 bg-gradient-to-b from-violet-50 to-transparent p-6 shadow-lg dark:border-white/10 dark:from-violet-950/30">
+        <h2 className="text-center text-xl font-black">📊 Hasil Tes Diagnostik</h2>
+        <div className="mx-auto mt-3 w-fit rounded-full px-5 py-2 text-sm font-bold text-white shadow" style={{ backgroundColor: levelColor(hasil.levelRata) }}>
           🎯 Rata-rata: Level {hasil.levelRata} · {hasil.band}
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -589,7 +608,7 @@ function Diagnostik({
         <div className="mt-5 flex justify-center">
           <button
             onClick={onKeHub}
-            className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-teal-600/25 transition-transform hover:scale-105"
           >
             🎮 Lanjut ke Arena
           </button>
@@ -617,7 +636,7 @@ function Diagnostik({
       <button
         onClick={mulai}
         disabled={pending || habis}
-        className="mt-5 w-full rounded-lg bg-purple-600 py-3 font-semibold text-white hover:bg-purple-700 disabled:opacity-40"
+        className="mt-5 w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3 font-bold text-white shadow-lg shadow-violet-600/25 transition-transform hover:scale-[1.02] disabled:scale-100 disabled:opacity-40"
       >
         {pending ? "Menyiapkan…" : habis ? "🚫 Kesempatan habis" : "▶️ Mulai Tes Diagnostik"}
       </button>

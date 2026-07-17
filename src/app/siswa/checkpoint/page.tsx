@@ -63,40 +63,40 @@ function Hasil({
   const detik = row.durasiDetik % 60;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-10">
-      <header className="text-center">
-        <p className="text-sm text-zinc-500">Check Point {namaBulan(period)}</p>
-        <h1 className="mt-1 text-3xl font-bold">Selesai! 🎉</h1>
-        {row.waktuHabis && <p className="mt-1 text-sm text-amber-600">Waktu habis — jawaban otomatis terkumpul.</p>}
-      </header>
-
-      <div className="rounded-2xl border border-black/10 p-6 text-center dark:border-white/15">
-        <div className="text-6xl font-black" style={{ color: k.color }}>
-          {row.total}
-        </div>
-        <div className="mt-1 text-lg font-semibold" style={{ color: k.color }}>
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-5 py-8 sm:py-10">
+      {/* hero hasil — warna mengikuti klasifikasi */}
+      <div
+        className="as-pop relative overflow-hidden rounded-3xl p-7 text-center text-white shadow-xl"
+        style={{ background: `linear-gradient(140deg, ${k.color}, ${k.color}cc)` }}
+      >
+        <div aria-hidden className="absolute -right-4 -top-5 text-8xl opacity-20 as-float select-none">{k.ic}</div>
+        <p className="relative text-sm font-medium text-white/80">Check Point {namaBulan(period)}</p>
+        <h1 className="relative mt-1 text-2xl font-black">Selesai! 🎉</h1>
+        <div className="relative mt-3 text-7xl font-black leading-none as-float">{row.total}</div>
+        <div className="relative mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-4 py-1 text-sm font-bold ring-1 ring-white/30 backdrop-blur">
           {k.ic} {k.label}
         </div>
         {delta != null && (
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="relative mt-3 text-sm font-medium text-white/85">
             {delta > 0 ? `▲ Naik ${delta}` : delta < 0 ? `▼ Turun ${Math.abs(delta)}` : "Sama"} dibanding{" "}
             {namaBulan(prev!.period)} ({prev!.total})
           </p>
         )}
+        {row.waktuHabis && <p className="relative mt-2 text-xs text-white/80">⏱️ Waktu habis — jawaban otomatis terkumpul.</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Kartu judul="Numerasi" nilai={row.numerasi} benar={row.benarNum} total={row.totalNum} />
-        <Kartu judul="Literasi" nilai={row.literasi} benar={row.benarLit} total={row.totalLit} />
+        <Kartu judul="🔢 Numerasi" nilai={row.numerasi} benar={row.benarNum} total={row.totalNum} />
+        <Kartu judul="📖 Literasi" nilai={row.literasi} benar={row.benarLit} total={row.totalLit} />
       </div>
 
       <p className="text-center text-sm text-zinc-500">
-        Durasi pengerjaan {menit}m {detik}d · Check Point berikutnya tersedia bulan depan.
+        Durasi pengerjaan {menit}m {detik}d · Check Point berikutnya tersedia bulan depan. 🌟
       </p>
 
       <Link
         href="/siswa"
-        className="mx-auto rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white hover:bg-blue-700"
+        className="mx-auto rounded-full bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-2.5 font-bold text-white shadow-lg shadow-violet-600/25 transition-transform hover:scale-105"
       >
         Kembali ke Beranda
       </Link>
@@ -106,9 +106,9 @@ function Hasil({
 
 function Kartu({ judul, nilai, benar, total }: { judul: string; nilai: number; benar: number; total: number }) {
   return (
-    <div className="rounded-xl border border-black/10 p-4 text-center dark:border-white/15">
+    <div className="as-pop rounded-2xl border border-black/5 bg-white/70 p-4 text-center shadow-sm dark:border-white/10 dark:bg-white/10">
       <div className="text-sm text-zinc-500">{judul}</div>
-      <div className="mt-1 text-3xl font-bold">{nilai}</div>
+      <div className="mt-1 text-3xl font-black">{nilai}</div>
       <div className="text-xs text-zinc-400">
         {benar}/{total} benar
       </div>

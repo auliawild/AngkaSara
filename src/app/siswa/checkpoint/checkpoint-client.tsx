@@ -86,21 +86,30 @@ export default function CheckpointClient({
 
   if (fase === "intro") {
     return (
-      <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
-        <h1 className="text-2xl font-bold">Check Point {namaBulan}</h1>
-        <ul className="mt-4 space-y-1.5 text-sm text-zinc-600 dark:text-zinc-300">
-          <li>📐 20 soal numerasi + 📖 15 soal literasi (3 bacaan × 5)</li>
-          <li>⏱️ Waktu 30 menit — otomatis terkumpul saat habis</li>
-          <li>🔒 Hanya bisa dikerjakan <b>sekali</b> bulan ini</li>
-        </ul>
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        <button
-          onClick={mulai}
-          disabled={pending}
-          className="mt-6 w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {pending ? "Menyiapkan…" : sedangKerja ? "Lanjutkan" : "Mulai Check Point"}
-        </button>
+      <div className="as-pop overflow-hidden rounded-3xl border border-black/5 bg-white/70 shadow-lg dark:border-white/10 dark:bg-white/5">
+        <div className="relative overflow-hidden bg-gradient-to-br from-sky-500 to-blue-600 p-6 text-white">
+          <div aria-hidden className="absolute -right-3 -top-4 text-7xl opacity-20 as-float select-none">📋</div>
+          <p className="relative text-sm font-medium text-white/80">Ujian bulanan</p>
+          <h1 className="relative text-2xl font-black">Check Point {namaBulan}</h1>
+        </div>
+        <div className="p-6">
+          <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
+            <li>📐 20 soal numerasi + 📖 15 soal literasi (3 bacaan × 5)</li>
+            <li>⏱️ Waktu 30 menit — otomatis terkumpul saat habis</li>
+            <li>🔒 Hanya bisa dikerjakan <b>sekali</b> bulan ini</li>
+          </ul>
+          <p className="mt-4 text-sm font-semibold text-blue-600 dark:text-blue-300">
+            Tenang & fokus — kamu pasti bisa! 💪
+          </p>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          <button
+            onClick={mulai}
+            disabled={pending}
+            className="mt-5 w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/25 transition-transform hover:scale-[1.02] disabled:scale-100 disabled:opacity-50"
+          >
+            {pending ? "Menyiapkan…" : sedangKerja ? "Lanjutkan ▶️" : "Mulai Check Point ▶️"}
+          </button>
+        </div>
       </div>
     );
   }
