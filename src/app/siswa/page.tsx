@@ -74,12 +74,33 @@ export default async function SiswaPage() {
           </div>
         </section>
 
-        {/* KARTU MODUL */}
+        {/* KARTU MODUL — Check Point diletakkan paling bawah */}
         <div className="grid gap-4">
+          <ModuleCard
+            href="/siswa/skiba"
+            emoji="🧮"
+            title="SKIBA Math"
+            kepanjangan="Sistem Komputasi Intuitif Berhitung Aktif — Menalar, Analisis, Teliti, dan Hebat"
+            desc="Tes diagnostik, arena 10 topik × 20 level, kumpulkan skor & naik peringkat!"
+            gradient="from-emerald-500 to-teal-600"
+            cta={<CtaPill label="Berlatih" />}
+          />
+
+          <ModuleCard
+            href="/siswa/skibaca"
+            emoji="📖"
+            title="SKIBACA"
+            kepanjangan="Sahabat Kreatif, Inspirasi Baca Aksara, Cerdas Aktif"
+            desc="5 jurusan × 5 level, kuis pemahaman + adu kecepatan baca (WPM)."
+            gradient="from-amber-500 to-orange-600"
+            cta={<CtaPill label="Membaca" />}
+          />
+
           <ModuleCard
             href="/siswa/checkpoint"
             emoji="📋"
             title={`Check Point ${bulan}`}
+            kepanjangan="Titik ukur kemampuanmu tiap akhir bulan"
             desc={
               sudah
                 ? "Sudah dikerjakan bulan ini — lihat hasilmu."
@@ -100,24 +121,6 @@ export default async function SiswaPage() {
                 <CtaPill label={cp?.status === "in_progress" ? "Lanjutkan" : "Mulai"} />
               )
             }
-          />
-
-          <ModuleCard
-            href="/siswa/skiba"
-            emoji="🧮"
-            title="SKIBA Math"
-            desc="Tes diagnostik, arena 10 topik × 20 level, kumpulkan skor & naik peringkat!"
-            gradient="from-emerald-500 to-teal-600"
-            cta={<CtaPill label="Berlatih" />}
-          />
-
-          <ModuleCard
-            href="/siswa/skibaca"
-            emoji="📖"
-            title="SKIBACA"
-            desc="5 jurusan × 5 level, kuis pemahaman + adu kecepatan baca (WPM)."
-            gradient="from-amber-500 to-orange-600"
-            cta={<CtaPill label="Membaca" />}
           />
         </div>
 
@@ -157,6 +160,7 @@ function ModuleCard({
   href,
   emoji,
   title,
+  kepanjangan,
   desc,
   gradient,
   cta,
@@ -164,6 +168,7 @@ function ModuleCard({
   href: string;
   emoji: string;
   title: string;
+  kepanjangan?: string;
   desc: string;
   gradient: string;
   cta: React.ReactNode;
@@ -180,10 +185,13 @@ function ModuleCard({
         {emoji}
       </div>
       <div className="relative min-w-0 flex-1">
-        <h2 className="text-lg font-black">{title}</h2>
-        <p className="mt-0.5 text-sm text-white/85">{desc}</p>
+        <h2 className="text-lg font-black leading-tight">{title}</h2>
+        {kepanjangan && (
+          <p className="mt-0.5 text-[11px] font-semibold italic leading-snug text-white/75">{kepanjangan}</p>
+        )}
+        <p className="mt-1 text-sm text-white/85">{desc}</p>
       </div>
-      <div className="relative shrink-0">{cta}</div>
+      <div className="relative shrink-0 self-start pt-1">{cta}</div>
     </Link>
   );
 }

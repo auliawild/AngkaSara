@@ -15,9 +15,12 @@ export default async function SkibaPage() {
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-5 py-8 sm:py-10">
       <header className="as-pop relative flex items-center justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-5 text-white shadow-lg shadow-teal-600/20">
         <div aria-hidden className="absolute -right-3 -top-4 text-7xl opacity-20 as-float select-none">🧮</div>
-        <div className="relative">
+        <div className="relative max-w-[78%]">
           <h1 className="text-2xl font-black">SKIBA Math</h1>
-          <p className="text-sm text-white/80">Latihan numerasi · {sesi.nama.split(" ")[0]} 💪</p>
+          <p className="mt-0.5 text-xs font-semibold italic leading-snug text-white/80">
+            Sistem Komputasi Intuitif Berhitung Aktif — Menalar, Analisis, Teliti, dan Hebat
+          </p>
+          <p className="mt-1 text-sm text-white/75">Latihan numerasi · {sesi.nama.split(" ")[0]} 💪</p>
         </div>
         <Link
           href="/siswa"
