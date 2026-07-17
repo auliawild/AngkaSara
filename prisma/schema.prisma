@@ -53,6 +53,8 @@ model Student {
   createdAt   DateTime           @default(now())
   activities  PracticeActivity[]
   checkpoints CheckpointResult[]
+  skibaTopics SkibaTopicState[]
+  skibaProfile SkibaProfile?
 
   @@index([kelasId])
 }
@@ -164,6 +166,33 @@ model CheckpointResult {
 
   @@unique([studentId, period]) // kunci 1x/bulan
   @@index([kelasLabel, period])
+}
+
+// ── SKIBA Math (Phase 2): progres game numerasi per siswa, terpusat di DB ──
+// Menggantikan localStorage `ls_skiba_topic_state` lama. Satu baris per (siswa, topik).
+// Papan peringkat TIDAK punya tabel sendiri: diturunkan dari PracticeActivity (points desc).
+model SkibaTopicState {
+  id          String   @id @default(cuid())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  topicId     String // salah satu TOPICS[].id di src/lib/soal-numerasi.ts
+  maxUnlocked Int      @default(1) // level tertinggi yang boleh dimainkan (1..20)
+  score       Int      @default(0) // akumulasi points (combo) di topik ini
+  recLevel    Int      @default(1) // level rekomendasi dari tes diagnostik
+  progress    String   @default("[]") // JSON string: number[] level yang pernah diselesaikan
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, topicId])
+  @@index([studentId])
+}
+
+// Profil SKIBA per siswa — menampung kuota tes diagnostik (maks 2x, seumur akun).
+model SkibaProfile {
+  id           String   @id @default(cuid())
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String   @unique
+  diagAttempts Int      @default(0)
+  updatedAt    DateTime @updatedAt
 }
 
 model ReadingPassage {

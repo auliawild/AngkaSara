@@ -5,6 +5,16 @@
 
 ---
 
+## PRISMA7-02 — Model Prisma baru `undefined` di `next dev` yang sudah jalan (client ter-cache)
+- **Gejala:** setelah tambah model (SkibaTopicState) + `prisma migrate/generate`, runtime error
+  `TypeError: Cannot read properties of undefined (reading 'findMany')` di `prisma.skibaTopicState`,
+  padahal `tsc --noEmit` bersih (tipe sudah ada di `src/generated/prisma`).
+- **Sebab:** proses `next dev` yang sedang berjalan memuat Prisma Client LAMA di memori; HMR tak
+  memuat ulang client hasil generate (mirip modul node_modules).
+- **Solusi:** **restart dev server** setelah `prisma generate`/`migrate dev`. (Stop proses listener
+  port 3000 lalu `npm run dev` lagi.) tsc tetap benar karena baca tipe dari disk.
+- **Status:** ✅ teratasi (operasional; bukan bug kode).
+
 ## EXCEL-01 — Impor siswa: `"use server"` hanya boleh export async + exceljs jangan di-bundle
 - **Gejala/risiko:** (a) menaruh helper murni sinkron (`hitungImpor`) di file `src/server/students.ts` yg berdirektif `"use server"` → build gagal (aturan Next: SEMUA export file server action wajib async function). (b) exceljs (lib Node besar) berisiko error saat di-bundle Turbopack/webpack untuk route handler & server action.
 - **Solusi (diterapkan):**

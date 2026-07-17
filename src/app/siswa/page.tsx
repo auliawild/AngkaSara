@@ -58,6 +58,21 @@ export default async function SiswaPage() {
         )}
       </Link>
 
+      <Link
+        href="/siswa/skiba"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
+      >
+        <div>
+          <h2 className="text-lg font-semibold">🧮 SKIBA Math</h2>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+            Latihan numerasi: tes diagnostik, arena 10 topik × 20 level, papan peringkat.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+          Berlatih
+        </span>
+      </Link>
+
       <KeluarSiswa />
     </main>
   );

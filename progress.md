@@ -3,9 +3,55 @@
 > Log kronologis. Entri terbaru di ATAS. Tiap langkah selesai dicatat di sini supaya
 > sesi Claude berikutnya langsung paham posisi. Format tanggal: YYYY-MM-DD.
 
-Status keseluruhan: **Phase 1 backbone — verifikasi akhir e2e (#10) tuntas. Siap commit awal & Phase 2 (SKIBA Math).**
+Status keseluruhan: **Phase 2 — SKIBA Math tuntas & terverifikasi. Berikutnya Phase 3 (SKIBACA).**
 
 Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · ⛔ terblokir
+
+---
+
+## 2026-07-17 — Phase 2: SKIBA Math (port game numerasi) — TUNTAS
+
+### ✅ Diagnostik + Arena + Unlock + Peringkat, server-generated & server-graded, persist DB
+Port dari `D:\LitNum\skiba-math.html` memakai `src/lib/soal-numerasi.ts` (generator tak ditulis ulang).
+- **Keamanan (sama filosofi Check Point):** soal dibangkitkan & dinilai di SERVER; klien tak pernah
+  menerima kunci → **tak ada umpan-balik benar/salah saat main** (juice: bintang/combo/confetti/suara
+  sukses hanya di layar hasil). Alih-alih attempt-row, dipakai **TOKEN JWT ber-seed** (jose, secret
+  `STUDENT_SESSION_SECRET`, terikat studentId, kedaluwarsa 30mnt): mulai→build dari seed acak + kirim
+  tersanitasi + token; submit→verifikasi token, REBUILD identik dari seed, nilai. Determinisme dijaga
+  urutan konsumsi RNG sama di mulai & submit.
+- **DB baru:** `SkibaTopicState(studentId,topicId,maxUnlocked,score,recLevel,progress JSON)` @@unique
+  ([studentId,topicId]) + `SkibaProfile(studentId @unique, diagAttempts)`. Migrasi `20260717130021_skiba_math`.
+  Papan peringkat TANPA tabel sendiri → diturunkan dari `PracticeActivity` (points desc).
+- **Lib** `src/lib/skiba.ts` (murni, 14 tes): levelTime/levelPoints/bintang/levelBand/levelColor,
+  buildArena(10)/buildDiagnostik(30) deterministik, sanitasi (buang answer), nilaiArena (**replay combo
+  berurutan** = identik versi lama), nilaiDiagnostik (recLevel per-topik = clamp(round(topicPct*19)+1)).
+- **Server** `src/server/skiba.ts`: muatSkiba, mulaiArena/submitArena (**unlock ditegakkan server**;
+  tulis SkibaTopicState + PracticeActivity NUMERASI score%=benar/10, points=combo, stars), mulaiDiagnostik
+  (**kuota maks 2× ditegakkan, konsumsi saat mulai**)/submitDiagnostik (set recLevel+maxUnlocked per-topik,
+  score arena dipertahankan), muatPeringkat.
+- **UI** `/siswa/skiba` (server hub) + `skiba-client.tsx` (klien): nav Topik/Diagnostik/Peringkat,
+  grid 10 topik (progress bar per-level warna), Arena (pilih topik→grid 20 level dgn kunci🔒→main
+  kuis timer per-soal→hasil bintang/poin/combo/unlock), Diagnostik (intro sisa→30 soal→hasil badge+
+  rincian per-topik), Peringkat (tabel dari PracticeActivity, medali, sorot "kamu"). Confetti + Web
+  Audio (klien murni). Kartu SKIBA ditambah di `/siswa`.
+- **Verifikasi:**
+  - `npm test` **50/50** (+14 `tests/skiba.test.ts`): determinisme build, sanitasi tak bocor kunci,
+    replay combo (2 benar Lv8→42*1+42*2), unlock hanya bila ≥2★ & level≥cap & <20, diagnostik recLevel.
+  - `npm run build` **sukses** (rute `/siswa/skiba` compile; RSC/server-action/klien valid, 13 halaman).
+  - **E2e browser (login siswa NISN uji `0012345678`):** hub render 10 topik; Arena Penjumlahan Lv1
+    (Lv2–20 terkunci🔒 dari server) → main → **server nilai 2/10 = 42 poin, combo x3, 1★** (level 1:
+    14*1+14*2=42, cocok) → DB: `SkibaTopicState.tambah` score42/progress[1], `PracticeActivity`
+    Penjumlahan score20/stars1/points42/"2/10 benar" (dibaca Evaluasi guru) ; Peringkat menampilkan
+    Budi 🥇 42; Diagnostik konsumsi 1 kuota → 30 soal campuran → **rata Level 6, per-topik: kali/pecahan/
+    akar Lv7, konversi Lv14, aljabar Lv20 (terkunci→terbuka), score arena tetap 42** ; hub: 5/10 topik
+    dibuka, sisa diagnostik 1×. Tanpa error konsol.
+- **Catatan/gotcha:** regenerasi Prisma Client TAK terbaca proses `next dev` yang sudah jalan (client
+  ter-cache di memori) → **wajib restart dev server** setelah `prisma generate`/`migrate` (lihat buglog
+  PRISMA7-02).
+
+### Berikutnya
+- **Phase 3: SKIBACA** (port literasi, 500 bacaan; fitur "ringkasan" bacaan 16-20 **butuh LLM API** →
+  perlu keputusan penyedia). Commit Phase 2 menunggu konfirmasi user (kode uncommitted di atas `92d0054`).
 
 ---
 
