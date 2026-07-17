@@ -56,6 +56,7 @@ model Student {
   skibaTopics SkibaTopicState[]
   skibaProfile SkibaProfile?
   skibacaProgress SkibacaProgress[]
+  skibacaDiagnostics SkibacaDiagnostic[]
 
   @@index([kelasId])
 }
@@ -240,6 +241,21 @@ model SkibacaProgress {
   updatedAt DateTime       @updatedAt
 
   @@unique([studentId, passageId])
+  @@index([studentId])
+}
+
+// Hasil Tes Diagnostik SKIBACA per siswa per jurusan (saran level awal, bukan unlock —
+// semua bacaan tetap terbuka). Server-graded; boleh diulang (upsert menimpa hasil lama).
+model SkibacaDiagnostic {
+  id          String   @id @default(cuid())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  jurusanKode String
+  recommended Int // level rekomendasi 1..5
+  scores      String // JSON: { "1": 80, "2": 60, ... } skor% per level yang diujikan
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, jurusanKode])
   @@index([studentId])
 }
 

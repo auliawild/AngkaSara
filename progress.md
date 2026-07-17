@@ -9,6 +9,37 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — SKIBACA: Tes Diagnostik (port fitur diagnostik) — TUNTAS
+
+### ✅ Diagnostik per jurusan, server-graded, rekomendasi level awal + persist DB
+Melengkapi Phase 3 dengan port fitur "Tes Diagnostik" dari `D:\LitNum\skibaca.html` (dulu ditunda).
+- **Alur (persis sumber):** per jurusan, 5 bacaan sampel = bacaan pertama (urutan 1) tiap level 1–5 →
+  baca+kuis tiap bacaan (25 soal) → **server menilai** thd DB. Rekomendasi = **level tertinggi
+  berturut dari 1 dgn skor ≥70%** (`finishDiagnostik`). Bersifat SARAN saja — tak ada unlock
+  (semua bacaan tetap terbuka), boleh diulang tanpa batas (upsert menimpa).
+- **Keamanan:** ikut pola `submitBacaan` — kunci (answerIndex) tak pernah ke klien, sampel
+  ditentukan server (klien tak pilih bacaan). TANPA JWT (konten di DB, sampel deterministik).
+- **DB baru:** `SkibacaDiagnostic`(studentId, jurusanKode, recommended, scores JSON
+  @@unique[studentId,jurusanKode]), migrasi `20260717212401_skibaca_diagnostic`.
+- **Lib** `src/lib/skibaca.ts`: `DIAG_AMBANG=70`, `DIAG_URUTAN_SAMPEL=1`, `rekomendasiLevel()` +
+  tipe `DiagBacaanKlien`/`DiagLevelSkor`/`HasilDiagnostikBaca`.
+- **Server** `src/server/skibaca.ts`: `mulaiDiagnostikBaca(kode)` (kirim 5 bacaan tanpa kunci),
+  `submitDiagnostikBaca` (nilai per level → rekomendasi → upsert). `muatJurusan` kini sertakan
+  `diagnostik` (rekomendasi tersimpan). **TIDAK** tulis PracticeActivity/SkibacaProgress (murni saran,
+  tak mengotori peringkat/Evaluasi guru).
+- **UI** `skibaca-client.tsx`: kartu "🎯 Tes Diagnostik" di JurusanView (intro / rekomendasi + "Mulai
+  dari Level X"), komponen alur `DiagnostikBaca` (5 bacaan berurut, progress bar, hasil = level saran +
+  bar skor per level).
+- **Verifikasi:** `npm test` **59/59** (+4 tes `rekomendasiLevel`); `npm run build` sukses; **e2e
+  siswa (Budi/0012345678):** diagnostik TKR, benar L1&L2 / salah L3–5 → **rekomendasi Level 2** ✓,
+  "Mulai dari Level 2" buka daftar bacaan L2, kartu reload "Rekomendasi terakhir: Level 2". DB
+  `SkibacaDiagnostic{TKR,2,{1:100,2:100,3:0,4:0,5:0}}`; PracticeActivity/SkibacaProgress TIDAK bertambah.
+  Tanpa error konsol.
+- **Catatan:** perlu `prisma generate` + restart `next dev` setelah migrasi (build sempat gagal type
+  `skibacaDiagnostic` sebelum generate — PRISMA7-02). Uncommitted di atas `e16821c`.
+
+---
+
 ## 2026-07-18 — Phase 3: SKIBACA (port literasi) — TUNTAS
 
 ### ✅ 375 bacaan kuis (5 jurusan × 5 level × 15), server-graded + WPM + persist DB

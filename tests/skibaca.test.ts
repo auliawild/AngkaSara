@@ -5,6 +5,7 @@ import {
   persenSkor,
   badgeSkibaca,
   labelPanjang,
+  rekomendasiLevel,
 } from "@/lib/skibaca";
 
 describe("skibaca — hitungKata & WPM", () => {
@@ -41,5 +42,24 @@ describe("skibaca — labelPanjang", () => {
     expect(labelPanjang(59)).toBe("Sedang");
     expect(labelPanjang(90)).toBe("Panjang");
     expect(labelPanjang(120)).toBe("Sangat panjang");
+  });
+});
+
+describe("skibaca — rekomendasiLevel (diagnostik)", () => {
+  it("level tertinggi berturut dari 1 dengan skor ≥ 70", () => {
+    expect(rekomendasiLevel({ 1: 100, 2: 80, 3: 70, 4: 60, 5: 100 })).toBe(3);
+    expect(rekomendasiLevel({ 1: 90, 2: 90, 3: 90, 4: 90, 5: 90 })).toBe(5);
+  });
+  it("gagal di level 1 → tetap rekomendasi Level 1 (minimal)", () => {
+    expect(rekomendasiLevel({ 1: 40, 2: 100, 3: 100, 4: 100, 5: 100 })).toBe(1);
+    expect(rekomendasiLevel({})).toBe(1);
+  });
+  it("berhenti pada celah/level tak diujikan meski level lebih tinggi lulus", () => {
+    expect(rekomendasiLevel({ 1: 80, 3: 90, 4: 90 })).toBe(1); // level 2 tak ada → putus
+    expect(rekomendasiLevel({ 1: 80, 2: 80 })).toBe(2); // 3..5 tak ada → berhenti di 2
+  });
+  it("ambang tepat 70 dianggap lulus, 69 gagal", () => {
+    expect(rekomendasiLevel({ 1: 70 })).toBe(1);
+    expect(rekomendasiLevel({ 1: 69, 2: 100 })).toBe(1);
   });
 });

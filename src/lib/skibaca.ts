@@ -11,6 +11,26 @@ export const SOAL_PER_BACAAN = 5;
 export const JUMLAH_LEVEL = 5;
 export const BACAAN_PER_LEVEL = 15; // ringkasan (16-20) disembunyikan untuk rilis awal
 
+/** Bacaan pertama tiap level dipakai sebagai sampel Tes Diagnostik (urutan 1..15 → pakai 1). */
+export const DIAG_URUTAN_SAMPEL = 1;
+/** Ambang lulus per level pada diagnostik (skor% ≥ ini dianggap kuasai level itu). */
+export const DIAG_AMBANG = 70;
+
+/**
+ * Rekomendasi level awal dari skor diagnostik per level.
+ * Port `finishDiagnostik`: rec = level TERTINGGI berturut mulai dari 1 dengan skor ≥ DIAG_AMBANG;
+ * berhenti pada level pertama yang gagal/tak diujikan. Minimal Level 1.
+ */
+export function rekomendasiLevel(scoresByLevel: Record<number, number>): number {
+  let rec = 1;
+  for (let lv = 1; lv <= JUMLAH_LEVEL; lv++) {
+    const sc = scoresByLevel[lv];
+    if (sc !== undefined && sc >= DIAG_AMBANG) rec = lv;
+    else break;
+  }
+  return rec;
+}
+
 /** Jumlah kata sebuah teks (dipakai untuk WPM & label panjang). */
 export function hitungKata(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -78,4 +98,27 @@ export interface HasilBacaan {
   detikBaca: number;
   badge: BadgeSkibaca;
   koreksi: { urutan: number; benar: boolean; answerIndex: number; pilih: number | null }[];
+}
+
+/* ---- Tes Diagnostik (per jurusan): 1 bacaan sampel per level, tanpa kunci ---- */
+export interface DiagBacaanKlien {
+  level: number;
+  passageId: string;
+  title: string;
+  text: string;
+  wordCount: number;
+  soal: SoalKlien[]; // TANPA answerIndex
+}
+export interface DiagLevelSkor {
+  level: number;
+  benar: number;
+  total: number;
+  percent: number;
+}
+export interface HasilDiagnostikBaca {
+  kode: string;
+  full: string;
+  icon: string;
+  recommended: number; // level saran (rekomendasiLevel)
+  perLevel: DiagLevelSkor[]; // 5 baris, level 1..5
 }
