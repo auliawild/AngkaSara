@@ -16,14 +16,14 @@ export default function MasukForm() {
   return (
     <div className="as-pop w-full max-w-sm rounded-3xl border border-black/5 bg-white/80 p-6 shadow-xl shadow-violet-500/10 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/80">
       <div className="mb-6 text-center">
-        {/* Lambang sekolah — ganti public/logo-sekolah.svg dengan logo asli (nama file tetap). */}
+        {/* Lambang resmi SMKN 1 Badegan (public/logo-sekolah.webp) */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo-sekolah.svg"
-          alt="Logo SMKN 1 Badegan"
-          width={80}
-          height={80}
-          className="mx-auto mb-3 h-20 w-20 drop-shadow-md as-float"
+          src="/logo-sekolah.webp"
+          alt="Logo SMK Negeri 1 Badegan Ponorogo"
+          width={96}
+          height={96}
+          className="mx-auto mb-3 h-24 w-24 object-contain drop-shadow-md as-float"
         />
         <h1 className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-3xl font-black tracking-tight text-transparent">
           AngkaSara
