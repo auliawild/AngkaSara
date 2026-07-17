@@ -3,9 +3,50 @@
 > Log kronologis. Entri terbaru di ATAS. Tiap langkah selesai dicatat di sini supaya
 > sesi Claude berikutnya langsung paham posisi. Format tanggal: YYYY-MM-DD.
 
-Status keseluruhan: **Phase 2 — SKIBA Math tuntas & terverifikasi. Berikutnya Phase 3 (SKIBACA).**
+Status keseluruhan: **Phase 3 — SKIBACA tuntas & terverifikasi. Ketiga fase inti (Phase 1–3) SELESAI.**
 
 Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · ⛔ terblokir
+
+---
+
+## 2026-07-18 — Phase 3: SKIBACA (port literasi) — TUNTAS
+
+### ✅ 375 bacaan kuis (5 jurusan × 5 level × 15), server-graded + WPM + persist DB
+Port dari `D:\LitNum\skibaca.html` + `assets/bacaan-tptup.js`.
+- **Keputusan user:** fitur "ringkasan" (bacaan 16–20) **DISEMBUNYIKAN** dulu (offline; hanya 15 kuis/
+  level aktif) — bisa diaktifkan nanti dgn LLM API. Cakupan: **semua 5 jurusan** diport.
+- **Ekstraksi** (skrip sekali pakai di scratchpad): eval `TPTUP_RAW` + slice `JURUSAN_DATA` dari sumber,
+  `mk()` kanonik (opsi[0]=benar) → `prisma/data/skibaca.json` = **375 bacaan / 1875 soal** (indeks 0–14).
+- **DB baru:** `SkibacaPassage`(jurusanKode,jurusanFull,icon,level,urutan,title,text,wordCount
+  @@unique[jurusanKode,level,urutan]) + `SkibacaQuestion`(passageId,urutan,q,options JSON,answerIndex)
+  + `SkibacaProgress`(studentId,passageId,percent,wpm @@unique[studentId,passageId]). Migrasi
+  `20260717170155_skibaca`. Tabel TERPISAH dari ReadingPassage (Check Point) krn struktur jurusan×level.
+- **Seed** `prisma/seed-skibaca.ts` (`npm run seed:skibaca`, idempoten TANPA hapus progres: upsert by
+  unique → id stabil): opsi diacak **deterministik** (seed=kode|level|urutan|qi) + answerIndex disimpan
+  (kunci tak selalu di A). Terisi 375 passage / 1875 soal.
+- **Lib** `src/lib/skibaca.ts` (murni, 5 tes): hitungKata, hitungWpm (kata/detik×60, min 1 dtk),
+  persenSkor, badgeSkibaca (Mandiri≥90/Instruksional≥70/Perlu Bimbingan — **display-only, beda dari
+  rapor**), labelPanjang.
+- **Server** `src/server/skibaca.ts`: muatRingkasanJurusan (kartu hub), muatJurusan (level+bacaan+
+  progres), mulaiBacaan (kirim TANPA answerIndex), submitBacaan (**nilai di server** thd DB, WPM,
+  simpan progres TERBAIK, catat `PracticeActivity` domain LITERASI score%/wpm → dibaca Evaluasi guru).
+- **UI** `/siswa/skibaca` (server hub) + `skibaca-client.tsx`: hub 5 jurusan (progress bar) → level +
+  daftar bacaan (kata/panjang/skor-wpm) → layar baca (timer WPM mulai saat tampil) → kuis 5 MCQ →
+  hasil (badge, skor, WPM, waktu, rincian jawaban + kunci). Kartu SKIBACA di `/siswa`.
+- **Verifikasi:**
+  - `npm test` **55/55** (+5 `tests/skibaca.test.ts`: WPM, persen, badge ambang, labelPanjang).
+  - `npm run build` **sukses** (rute `/siswa/skibaca` compile; 14 halaman).
+  - **E2e browser (login siswa NISN uji `0012345678`):** hub 5 jurusan (0/75) → TKR → Level 1 (0/15) →
+    "Mobil Ayah" (28 kata) → baca → kuis 5 soal (opsi teracak, kunci tak bocor) → jawab benar semua →
+    **server nilai 100% (5/5), 67 wpm** (28/25×60=67 ✓), badge **Mandiri**, rincian jawaban benar ;
+    DB: `SkibacaProgress` 100%/67, `PracticeActivity` LITERASI "Teknik Kendaraan Ringan"/Mobil Ayah/
+    100/67/"5/5 soal benar" ; daftar refresh → Level 1 "1/15", bacaan 100%/67wpm. Tanpa error konsol.
+- **Catatan:** restart `next dev` setelah generate/migrate (PRISMA7-02). Diagnostik SKIBACA lama TIDAK
+  diport (opsional; unlock literasi tak dipakai — semua bacaan langsung terbuka, sesuai sumber).
+
+### Berikutnya
+- Fase inti (1–3) selesai. Opsi lanjutan: aktifkan fitur ringkasan SKIBACA (perlu LLM API), editor
+  admin CRUD bacaan, deploy VPS (Postgres + Docker). Commit Phase 3 menunggu konfirmasi user (di atas `e16821c`).
 
 ---
 

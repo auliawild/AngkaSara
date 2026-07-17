@@ -55,6 +55,7 @@ model Student {
   checkpoints CheckpointResult[]
   skibaTopics SkibaTopicState[]
   skibaProfile SkibaProfile?
+  skibacaProgress SkibacaProgress[]
 
   @@index([kelasId])
 }
@@ -193,6 +194,53 @@ model SkibaProfile {
   studentId    String   @unique
   diagAttempts Int      @default(0)
   updatedAt    DateTime @updatedAt
+}
+
+// ── SKIBACA (Phase 3): bacaan literasi per jurusan/level, terpusat di DB ──
+// 5 jurusan × 5 level × 15 bacaan kuis = 375 (ringkasan 16-20 disembunyikan untuk rilis awal).
+// Tabel terpisah dari ReadingPassage (Check Point) karena berstruktur jurusan×level×urutan.
+// Konten di-seed dari prisma/data/skibaca.json (npm run seed:skibaca).
+model SkibacaPassage {
+  id          String            @id @default(cuid())
+  jurusanKode String // TKR | TSM | TKJ | Kuliner | TPTUP
+  jurusanFull String
+  icon        String
+  level       Int // 1..5
+  urutan      Int // 1..15
+  title       String
+  text        String
+  wordCount   Int
+  questions   SkibacaQuestion[]
+  progress    SkibacaProgress[]
+
+  @@unique([jurusanKode, level, urutan])
+  @@index([jurusanKode, level])
+}
+
+model SkibacaQuestion {
+  id          String         @id @default(cuid())
+  passage     SkibacaPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId   String
+  urutan      Int
+  q           String
+  options     String // JSON string: string[4] (urutan kanonik hasil shuffle seed). SQLite tak dukung Json.
+  answerIndex Int
+
+  @@index([passageId])
+}
+
+model SkibacaProgress {
+  id        String         @id @default(cuid())
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+  passage   SkibacaPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId String
+  percent   Int // skor kuis 0..100 (terbaik dipertahankan)
+  wpm       Int // kata per menit saat capaian terbaik
+  updatedAt DateTime       @updatedAt
+
+  @@unique([studentId, passageId])
+  @@index([studentId])
 }
 
 model ReadingPassage {

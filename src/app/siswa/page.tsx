@@ -73,6 +73,21 @@ export default async function SiswaPage() {
         </span>
       </Link>
 
+      <Link
+        href="/siswa/skibaca"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-black/10 p-6 transition-colors hover:border-amber-400 hover:bg-amber-50/40 dark:border-white/15 dark:hover:border-amber-700 dark:hover:bg-amber-950/20"
+      >
+        <div>
+          <h2 className="text-lg font-semibold">📖 SKIBACA</h2>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+            Latihan membaca: 5 jurusan × 5 level, kuis pemahaman + hitung kecepatan baca (WPM).
+          </p>
+        </div>
+        <span className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white">
+          Membaca
+        </span>
+      </Link>
+
       <KeluarSiswa />
     </main>
   );

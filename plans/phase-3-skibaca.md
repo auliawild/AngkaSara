@@ -1,7 +1,14 @@
 # Phase 3 — Port SKIBACA (literasi)
 
-Belum dikerjakan. Prasyarat: Phase 1 & 2. Sumber port: `D:\LitNum\skibaca.html`
-+ `D:\LitNum\assets\bacaan-tptup.js`.
+✅ **TUNTAS 2026-07-18** (detail di progress.md). Ringkas: 375 bacaan kuis (5 jurusan × 5 level × 15,
+ringkasan disembunyikan atas keputusan user) diekstrak → `prisma/data/skibaca.json`, di-seed
+(`npm run seed:skibaca`) ke tabel baru `SkibacaPassage/Question/Progress` (migrasi `20260717170155_skibaca`).
+Lib `src/lib/skibaca.ts` (5 tes), server `src/server/skibaca.ts` (server-graded, WPM, progres terbaik,
+PracticeActivity LITERASI), UI `/siswa/skibaca` (hub jurusan→level→bacaan→baca+timer→kuis→hasil badge/WPM).
+Verifikasi: test 55/55, build sukses, e2e siswa (baca→kuis 100%/67wpm→persist→muncul di progres & Evaluasi).
+Fitur **ringkasan (16–20) BELUM diaktifkan** — perlu LLM API (opsi a/b/c di bawah masih relevan).
+
+Sumber port: `D:\LitNum\skibaca.html` + `D:\LitNum\assets\bacaan-tptup.js`.
 
 ## Volume konten (besar — kerjakan bertahap per jurusan)
 - **5 jurusan** (TKR, TSM, TKJ, Kuliner, TPTUP), masing-masing **5 level × 20 bacaan = 100** →
