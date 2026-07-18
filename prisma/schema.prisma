@@ -74,6 +74,7 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   role          String    @default("GURU") // additionalField: ADMIN | GURU
+  nip           String?   @unique // NIP staf (identitas login guru; null utk akun admin lama berbasis email)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]

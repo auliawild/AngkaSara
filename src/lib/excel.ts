@@ -21,12 +21,18 @@ const NAMA_LEMBAR = "Siswa";
 
 /* ============================ BACA ============================ */
 
-/** Deteksi jenis berkas dari nama lalu parse jadi baris {nisn, nama, kelas}. */
-export async function parseSiswa(buffer: ArrayBuffer, filename: string): Promise<BarisSiswa[]> {
+/** Baris mentah sebuah berkas (dipakai bersama oleh impor siswa & staf). */
+export interface BarisMentah {
+  r: number; // nomor baris 1-based
+  cells: string[];
+}
+
+/** Deteksi jenis berkas lalu baca jadi baris mentah {r, cells}. Pemetaan kolom dilakukan pemanggil. */
+export async function readRows(buffer: ArrayBuffer, filename: string): Promise<BarisMentah[]> {
   const ext = (filename.split(".").pop() || "").toLowerCase();
-  if (ext === "csv" || ext === "txt") return parseCsv(new TextDecoder().decode(buffer));
+  if (ext === "csv" || ext === "txt") return csvRows(new TextDecoder().decode(buffer));
   try {
-    return await parseXlsx(buffer);
+    return await xlsxRows(buffer);
   } catch (e) {
     // .xls (biner lama) tak didukung exceljs → pesan jelas.
     throw new Error(
@@ -37,7 +43,12 @@ export async function parseSiswa(buffer: ArrayBuffer, filename: string): Promise
   }
 }
 
-async function parseXlsx(buffer: ArrayBuffer): Promise<BarisSiswa[]> {
+/** Deteksi jenis berkas dari nama lalu parse jadi baris {nisn, nama, kelas}. */
+export async function parseSiswa(buffer: ArrayBuffer, filename: string): Promise<BarisSiswa[]> {
+  return mapRows(await readRows(buffer, filename));
+}
+
+async function xlsxRows(buffer: ArrayBuffer): Promise<BarisMentah[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
   const ws = wb.worksheets[0];
@@ -50,7 +61,7 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<BarisSiswa[]> {
     });
     rows.push({ r, cells });
   });
-  return mapRows(rows);
+  return rows;
 }
 
 /** Ambil teks sel apa adanya (angka NISN tetap string; rich text/hyperlink/formula ditangani). */
@@ -66,14 +77,13 @@ function cellText(cell: ExcelJS.Cell): string {
   return String(cell.text ?? "").trim();
 }
 
-function parseCsv(teks: string): BarisSiswa[] {
+function csvRows(teks: string): BarisMentah[] {
   const sep = deteksiPemisah(teks);
-  const rows = teks
+  return teks
     .split(/\r?\n/)
     .map((b, i) => ({ r: i + 1, isi: b }))
     .filter((x) => x.isi.trim() !== "")
     .map((x) => ({ r: x.r, cells: pecahBaris(x.isi, sep) }));
-  return mapRows(rows);
 }
 
 function deteksiPemisah(teks: string): string {

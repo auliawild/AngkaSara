@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { masukSiswa } from "@/server/student-auth";
-import { signIn } from "@/lib/auth-client";
+import { masukStaf } from "@/server/staf-auth";
 
 type Tab = "siswa" | "staf";
 
@@ -116,7 +116,7 @@ function SiswaForm({ next, router }: FormProps) {
 }
 
 function StafForm({ next, router }: FormProps) {
-  const [email, setEmail] = useState("");
+  const [nip, setNip] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -125,10 +125,10 @@ function StafForm({ next, router }: FormProps) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await signIn.email({ email, password });
+    const res = await masukStaf(nip, password);
     setLoading(false);
-    if (error) {
-      setError(error.message ?? "Email atau kata sandi salah.");
+    if (!res.ok) {
+      setError(res.error ?? "NIP atau kata sandi salah.");
       return;
     }
     router.push(next && next.startsWith("/guru") ? next : "/guru");
@@ -137,16 +137,15 @@ function StafForm({ next, router }: FormProps) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <label className="text-sm font-medium" htmlFor="email">
-        Email
+      <label className="text-sm font-medium" htmlFor="nip">
+        NIP
       </label>
       <input
-        id="email"
-        type="email"
+        id="nip"
         autoComplete="username"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="nama@sekolah.sch.id"
+        value={nip}
+        onChange={(e) => setNip(e.target.value)}
+        placeholder="Masukkan NIP"
         className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
       />
       <label className="text-sm font-medium" htmlFor="password">
@@ -164,11 +163,12 @@ function StafForm({ next, router }: FormProps) {
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
-        disabled={loading || !email || !password}
+        disabled={loading || !nip || !password}
         className="mt-2 rounded-lg bg-zinc-900 py-2.5 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
       >
         {loading ? "Masuk…" : "Masuk sebagai Staf"}
       </button>
+      <p className="text-center text-xs text-zinc-400">Sandi awal = NIP. Admin dapat memakai email.</p>
     </form>
   );
 }

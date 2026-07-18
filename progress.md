@@ -10,6 +10,40 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — Impor Guru & Staf (login NIP) — TUNTAS (perlu restart dev + cek login live)
+
+### ✅ Impor guru/staf via Excel (Nama, NIP), login staf jadi NIP + password
+Permintaan user. Impor siswa (Nama, NISN, Kelas) sudah ada sejak Phase 1 — tak diubah.
+- **Keputusan user:** login staf = **NIP + password**; semua impor berperan **GURU**; **sandi awal = NIP**.
+- **Schema:** `User.nip String? @unique` (null utk admin lama berbasis email). Migrasi
+  `20260718100324_staf_nip` (dibuat MANUAL krn `migrate dev` interaktif di env non-interaktif —
+  `ALTER TABLE user ADD COLUMN nip` + unique index; diterapkan via `migrate deploy` + `prisma generate`).
+- **Login:** staf login pakai **NIP** → dipetakan ke **email internal** `‹nip›@guru.smkn1badegan.sch.id`
+  (`emailDariNip`) → Better Auth `signInEmail` (cookie via plugin nextCookies). **Admin lama tetap
+  bisa email** (input mengandung "@" → diperlakukan email). Server action baru `src/server/staf-auth.ts`
+  `masukStaf(nip|email, password)`. Form login `masuk-form.tsx` StafForm diubah Email → **NIP**
+  (hint "Sandi awal = NIP. Admin dapat memakai email").
+- **Lib murni + tes** `src/lib/impor-staf.ts` (`NIP_RE=/^\d{4,30}$/`, `emailDariNip`, `tampakEmail`,
+  `hitungImporStaf` → toAdd/ dilewati(dup NIP)/ gagal; 8 tes) + `src/lib/excel-staf.ts` (`parseStaf`
+  header Nama/NIP autodetect atau A/B; `templateStaf`). Refactor kecil `excel.ts`: ekstrak `readRows`
+  + `BarisMentah` (dipakai siswa & staf; perilaku siswa identik, tes impor siswa tetap lolos).
+- **Server** `src/server/staf.ts` (**requireAdmin** — hanya ADMIN): `imporStaf` (buat User+Account
+  credential, password=`hashPassword(nip)` scrypt Better Auth, role GURU, createMany dlm transaksi),
+  `hapusStaf` (tolak hapus ADMIN), `setelUlangSandiStaf` (reset sandi = NIP).
+- **UI** `/guru/staf` (admin-only; redirect non-admin ke /guru): `impor-staf-panel.tsx` (unggah+template),
+  `staf-tabel.tsx` (daftar; tombol reset sandi & hapus per guru), `template/route.ts`. Kartu
+  "🧑‍🏫 Kelola Guru & Staf" di dasbor **hanya tampil utk ADMIN**.
+- **Verifikasi:** `npm test` **83/83** (+6); `npm run build` sukses (rute `/guru/staf` & `/guru/staf/template`
+  terdaftar, TS bersih); **skrip DB** (tiru imporStaf lalu `verifyPassword` Better Auth): akun impor
+  password=NIP → `verify(nip)`=true, salah=false, mapping NIP→email benar, role GURU ✓; guard runtime
+  `/guru/staf` **307 → /masuk**.
+- **⚠️ Belum dicek live:** (1) **RESTART `next dev`** wajib — server berjalan (PID lama) masih cache Prisma
+  client tanpa `nip` → query nip error sampai restart. (2) Cookie sesi dari `signInEmail` di server action
+  saat login NIP live belum di-e2e (larangan ketik password) — pola nextCookies standar, perlu 1x login uji.
+- **Follow-up:** belum ada UI ganti-sandi mandiri utk guru (kini hanya admin reset ke NIP). Uncommitted di atas `a6c0a56`.
+
+---
+
 ## 2026-07-18 — Laporan Progres siswa & Raport siap cetak (guru/admin) — TUNTAS
 
 ### ✅ Rekap progres per siswa/per kelas + raport semester siap cetak

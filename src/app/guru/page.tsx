@@ -37,6 +37,17 @@ export default async function GuruPage() {
             Tambah, edit, hapus, dan impor siswa dari Excel.
           </p>
         </Link>
+        {role === "ADMIN" && (
+          <Link
+            href="/guru/staf"
+            className="rounded-xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
+          >
+            <h2 className="font-semibold">🧑‍🏫 Kelola Guru &amp; Staf</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              Impor guru/staf dari Excel (NIP), reset sandi, hapus akun.
+            </p>
+          </Link>
+        )}
         <Link
           href="/guru/evaluasi"
           className="rounded-xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
