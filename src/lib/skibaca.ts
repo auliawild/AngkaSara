@@ -9,7 +9,10 @@
 
 export const SOAL_PER_BACAAN = 5;
 export const JUMLAH_LEVEL = 5;
-export const BACAAN_PER_LEVEL = 15; // ringkasan (16-20) disembunyikan untuk rilis awal
+export const BACAAN_PER_LEVEL = 20; // 1..15 kuis (server-graded) + 16..20 ringkasan (dinilai guru)
+export const BACAAN_KUIS_PER_LEVEL = 15;
+export const MIN_KATA_RINGKASAN = 30; // ringkasan minimal (port MIN_WORDS_SUMMARY)
+export type TipeBacaan = "kuis" | "ringkasan";
 
 /** Bacaan pertama tiap level dipakai sebagai sampel Tes Diagnostik (urutan 1..15 → pakai 1). */
 export const DIAG_URUTAN_SAMPEL = 1;
@@ -121,4 +124,32 @@ export interface HasilDiagnostikBaca {
   icon: string;
   recommended: number; // level saran (rekomendasiLevel)
   perLevel: DiagLevelSkor[]; // 5 baris, level 1..5
+}
+
+/* ---- Ringkasan (bacaan 16..20): teks bebas, dinilai guru ---- */
+export interface RingkasanTersimpan {
+  text: string;
+  wordCount: number;
+  score: number | null; // skor guru; null = menunggu penilaian
+  feedback: string | null;
+  dinilai: boolean;
+}
+/** Bacaan ringkasan yang dikirim ke klien untuk ditulis (tanpa soal/kunci). */
+export interface RingkasanKlien {
+  id: string;
+  jurusanKode: string;
+  jurusanFull: string;
+  icon: string;
+  level: number;
+  urutan: number;
+  title: string;
+  text: string;
+  wordCount: number;
+  tersimpan: RingkasanTersimpan | null; // ringkasan siswa sebelumnya (jika ada)
+}
+
+/** Hitung kata ringkasan siswa (untuk word-count & validasi min). */
+export function hitungKataRingkasan(text: string): number {
+  const t = text.trim();
+  return t ? t.split(/\s+/).filter(Boolean).length : 0;
 }

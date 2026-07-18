@@ -9,6 +9,45 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — SKIBACA: Ringkasan bacaan 16–20 (dinilai guru manual) — TUNTAS
+
+### ✅ Aktifkan fitur ringkasan/parafrase (bacaan 16–20) — TANPA AI, penilaian guru manual
+Melengkapi Phase 3: fitur "ringkasan" yang dulu disembunyikan kini diaktifkan.
+- **Keputusan user:** penilaian **tanpa AI** — siswa menulis parafrase, disimpan, **guru menilai
+  manual** (skor 0–100 + catatan) di dashboard. Tak perlu API key/biaya. (Model Opus 4.8 dicatat
+  bila kelak mau AI grading.)
+- **Ekstraksi ulang** `prisma/data/skibaca.json`: **375 → 500 bacaan** (5 jurusan × 5 level × 20).
+  Skrip sekali pakai (scratchpad) eval sumber (`TPTUP_RAW`+inline `TKR_L1..KULINER_L5`+`JURUSAN_DATA`)
+  dgn `mk()` KANONIK (tanpa shuffle) → `{q,benar,salah[]}`. Diverifikasi bacaan **1–15 identik**
+  (0 beda) dgn json lama → progres siswa aman. 16–20 = 125 bacaan baru (tetap punya 5 soal =
+  POIN KUNCI untuk guru, TAK ditampilkan ke siswa).
+- **DB:** `SkibacaPassage.tipe` ("kuis" 1–15 | "ringkasan" 16–20) + model **`SkibacaSummary`**
+  (studentId, passageId, text, wordCount, score Int?, feedback?, gradedAt? @@unique[studentId,passageId]).
+  Migrasi `20260717225320_skibaca_summary`. Seed set tipe by urutan>15; re-seed 500 passage/2500 soal.
+- **Lib** `src/lib/skibaca.ts`: BACAAN_PER_LEVEL=20, MIN_KATA_RINGKASAN=30, `hitungKataRingkasan`,
+  tipe `RingkasanKlien`/`RingkasanTersimpan` (+2 tes).
+- **Server siswa** `src/server/skibaca.ts`: `mulaiRingkasan` (kirim teks tanpa soal + ringkasan lama),
+  `submitRingkasan` (validasi min kata, upsert; menulis ulang MERESET penilaian). `muatJurusan`
+  sertakan tipe+status ringkasan; `muatRingkasanJurusan` hitung ringkasan terkirim sbg selesai;
+  guard `mulaiBacaan`/`submitBacaan` tolak tipe ringkasan.
+- **Server guru** `src/server/skibaca-guru.ts` (auth staf Better Auth): `muatRingkasanUntukGuru`
+  (filter belum/semua, sertakan poin kunci), `nilaiRingkasan` (skor 0–100 + feedback + gradedAt).
+- **UI siswa** `skibaca-client.tsx`: bacaan ringkasan bertanda **✍️** (border ungu putus-putus) +
+  status belum/menunggu/skor; komponen `TulisRingkasan` (baca→textarea word-count→kirim→konfirmasi;
+  banner nilai guru bila sudah dinilai). **UI guru** `/guru/skibaca` + `nilai-ringkasan-client.tsx`
+  (kartu: ringkasan siswa + acuan teks asli & poin kunci + input skor/catatan) + kartu link di `/guru`.
+- **Verifikasi:** `npm test` **61/61** (+2); `npm run build` sukses (rute `/guru/skibaca`); **e2e:**
+  siswa (Budi) tulis ringkasan "Jok Mobil" (45 kata)→kirim→`SkibacaSummary` tersimpan (menunggu);
+  guard `/guru/skibaca` redirect ke Masuk utk sesi siswa ✓; penilaian guru **disimulasikan via DB**
+  (skor 85+catatan+gradedAt, meniru `nilaiRingkasan`) krn kebijakan larang ketik password login;
+  siswa muat ulang → "85 · dinilai" di daftar + banner "Sudah dinilai guru: 85 — …" saat dibuka;
+  hub 2/100. Tanpa error konsol.
+- **Catatan:** UI penilaian guru sendiri (klik-tayang) belum di-e2e via browser (butuh login staf —
+  password DEV `admin-angkasara-2026`); lolos build & server action sederhana. Uncommitted di atas
+  `045450a`.
+
+---
+
 ## 2026-07-18 — SKIBACA: Tes Diagnostik (port fitur diagnostik) — TUNTAS
 
 ### ✅ Diagnostik per jurusan, server-graded, rekomendasi level awal + persist DB

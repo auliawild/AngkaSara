@@ -1,5 +1,8 @@
 /**
- * Seed SKIBACA — 375 bacaan kuis (5 jurusan × 5 level × 15) dari prisma/data/skibaca.json.
+ * Seed SKIBACA — 500 bacaan (5 jurusan × 5 level × 20) dari prisma/data/skibaca.json:
+ * urutan 1..15 = tipe "kuis" (5 MCQ, server-graded), urutan 16..20 = tipe "ringkasan"
+ * (siswa menulis parafrase, guru menilai manual). Soal 16..20 tetap di-seed sebagai POIN KUNCI
+ * untuk membantu guru menilai (tak ditampilkan ke siswa).
  * Jalankan: `npm run seed:skibaca` (tsx). Idempoten TANPA menghapus progres siswa:
  * passage di-UPSERT by @@unique([jurusanKode,level,urutan]) → id stabil (FK progres aman);
  * soal diganti (deleteMany+create) tiap run.
@@ -73,15 +76,17 @@ async function main() {
     const kode = b.jurusanLabel; // TKR | TSM | TKJ | Kuliner | TPTUP
     const wordCount = b.text.trim().split(/\s+/).length;
 
+    const tipe = b.urutan > 15 ? "ringkasan" : "kuis";
     const passage = await prisma.skibacaPassage.upsert({
       where: { jurusanKode_level_urutan: { jurusanKode: kode, level: b.level, urutan: b.urutan } },
-      update: { jurusanFull: b.jurusanFull, icon: b.icon, title: b.title, text: b.text, wordCount },
+      update: { jurusanFull: b.jurusanFull, icon: b.icon, tipe, title: b.title, text: b.text, wordCount },
       create: {
         jurusanKode: kode,
         jurusanFull: b.jurusanFull,
         icon: b.icon,
         level: b.level,
         urutan: b.urutan,
+        tipe,
         title: b.title,
         text: b.text,
         wordCount,

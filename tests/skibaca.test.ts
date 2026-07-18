@@ -6,6 +6,8 @@ import {
   badgeSkibaca,
   labelPanjang,
   rekomendasiLevel,
+  hitungKataRingkasan,
+  MIN_KATA_RINGKASAN,
 } from "@/lib/skibaca";
 
 describe("skibaca — hitungKata & WPM", () => {
@@ -61,5 +63,19 @@ describe("skibaca — rekomendasiLevel (diagnostik)", () => {
   it("ambang tepat 70 dianggap lulus, 69 gagal", () => {
     expect(rekomendasiLevel({ 1: 70 })).toBe(1);
     expect(rekomendasiLevel({ 1: 69, 2: 100 })).toBe(1);
+  });
+});
+
+describe("skibaca — hitungKataRingkasan (ringkasan 16-20)", () => {
+  it("menghitung kata, mengabaikan spasi tepi/ganda", () => {
+    expect(hitungKataRingkasan("  Mobil  ayah   biru ")).toBe(3);
+    expect(hitungKataRingkasan("")).toBe(0);
+    expect(hitungKataRingkasan("   ")).toBe(0);
+  });
+  it("ambang minimal ringkasan = 30 kata", () => {
+    expect(MIN_KATA_RINGKASAN).toBe(30);
+    const teks = Array.from({ length: 30 }, (_, i) => `kata${i}`).join(" ");
+    expect(hitungKataRingkasan(teks)).toBe(30);
+    expect(hitungKataRingkasan(teks) >= MIN_KATA_RINGKASAN).toBe(true);
   });
 });

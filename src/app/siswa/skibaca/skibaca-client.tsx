@@ -9,21 +9,32 @@ import {
   muatJurusan,
   mulaiBacaan,
   submitBacaan,
+  mulaiRingkasan,
+  submitRingkasan,
   mulaiDiagnostikBaca,
   submitDiagnostikBaca,
   type JurusanRingkas,
   type JurusanDetail,
+  type BacaanRingkas,
   type SubmitBacaanHasil,
   type MulaiDiagnostikBacaHasil,
 } from "@/server/skibaca";
-import { labelPanjang, type BacaanKlien, type HasilDiagnostikBaca } from "@/lib/skibaca";
+import {
+  labelPanjang,
+  hitungKataRingkasan,
+  MIN_KATA_RINGKASAN,
+  type BacaanKlien,
+  type HasilDiagnostikBaca,
+  type RingkasanKlien,
+} from "@/lib/skibaca";
 
-type Mode = "hub" | "jurusan" | "baca" | "diagnostik";
+type Mode = "hub" | "jurusan" | "baca" | "ringkasan" | "diagnostik";
 
 export default function SkibacaClient({ jurusanAwal }: { jurusanAwal: JurusanRingkas[] }) {
   const [mode, setMode] = useState<Mode>("hub");
   const [detail, setDetail] = useState<JurusanDetail | null>(null);
   const [bacaan, setBacaan] = useState<BacaanKlien | null>(null);
+  const [ringkasan, setRingkasan] = useState<RingkasanKlien | null>(null);
   const [levelAwal, setLevelAwal] = useState(1); // level dibuka saat kembali ke JurusanView
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +59,19 @@ export default function SkibacaClient({ jurusanAwal }: { jurusanAwal: JurusanRin
     try {
       setBacaan(await mulaiBacaan(id));
       setMode("baca");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPending(false);
+    }
+  }, []);
+
+  const bukaRingkasan = useCallback(async (id: string) => {
+    setPending(true);
+    setError(null);
+    try {
+      setRingkasan(await mulaiRingkasan(id));
+      setMode("ringkasan");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -92,6 +116,21 @@ export default function SkibacaClient({ jurusanAwal }: { jurusanAwal: JurusanRin
     );
   }
 
+  if (mode === "ringkasan" && ringkasan) {
+    return (
+      <TulisRingkasan
+        ringkasan={ringkasan}
+        onSelesai={async () => {
+          await segarkanJurusan();
+        }}
+        onKeluar={() => {
+          setRingkasan(null);
+          setMode("jurusan");
+        }}
+      />
+    );
+  }
+
   if (mode === "jurusan" && detail) {
     return (
       <JurusanView
@@ -101,6 +140,7 @@ export default function SkibacaClient({ jurusanAwal }: { jurusanAwal: JurusanRin
         pending={pending}
         error={error}
         onPilihBacaan={bukaBacaan}
+        onPilihRingkasan={bukaRingkasan}
         onMulaiDiagnostik={() => setMode("diagnostik")}
         onMulaiRekomendasi={(lv) => setLevelAwal(lv)}
         onKembali={() => setMode("hub")}
@@ -160,6 +200,7 @@ function JurusanView({
   pending,
   error,
   onPilihBacaan,
+  onPilihRingkasan,
   onMulaiDiagnostik,
   onMulaiRekomendasi,
   onKembali,
@@ -169,6 +210,7 @@ function JurusanView({
   pending: boolean;
   error: string | null;
   onPilihBacaan: (id: string) => void;
+  onPilihRingkasan: (id: string) => void;
   onMulaiDiagnostik: () => void;
   onMulaiRekomendasi: (level: number) => void;
   onKembali: () => void;
@@ -235,7 +277,7 @@ function JurusanView({
 
       <div className="flex flex-wrap gap-2">
         {detail.levels.map((l) => {
-          const selesai = l.bacaan.filter((b) => b.percent != null).length;
+          const selesai = l.bacaan.filter((b) => b.percent != null || b.ringkasanKirim).length;
           return (
             <button
               key={l.level}
@@ -259,34 +301,84 @@ function JurusanView({
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="grid gap-2">
-        {level?.bacaan.map((b) => (
-          <button
-            key={b.id}
-            disabled={pending}
-            onClick={() => onPilihBacaan(b.id)}
-            className="flex items-center gap-3 rounded-xl border border-black/10 p-3 text-left transition-colors hover:border-amber-400 hover:bg-amber-50/40 disabled:opacity-50 dark:border-white/15 dark:hover:border-amber-700 dark:hover:bg-amber-950/20"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/5 text-sm font-bold dark:bg-white/10">
-              {b.urutan}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{b.title}</div>
-              <div className="text-xs text-zinc-500">
-                {b.wordCount} kata · {labelPanjang(b.wordCount)}
-              </div>
-            </div>
-            {b.percent != null ? (
-              <span className="shrink-0 text-right text-xs">
-                <span className="block font-bold text-amber-600">{b.percent}%</span>
-                <span className="text-zinc-400">{b.wpm} wpm</span>
+        {level?.bacaan.map((b) =>
+          b.tipe === "ringkasan" ? (
+            <BacaanRingkasanItem key={b.id} b={b} pending={pending} onPilih={onPilihRingkasan} />
+          ) : (
+            <button
+              key={b.id}
+              disabled={pending}
+              onClick={() => onPilihBacaan(b.id)}
+              className="flex items-center gap-3 rounded-xl border border-black/10 p-3 text-left transition-colors hover:border-amber-400 hover:bg-amber-50/40 disabled:opacity-50 dark:border-white/15 dark:hover:border-amber-700 dark:hover:bg-amber-950/20"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/5 text-sm font-bold dark:bg-white/10">
+                {b.urutan}
               </span>
-            ) : (
-              <span className="shrink-0 text-xs text-zinc-400">belum</span>
-            )}
-          </button>
-        ))}
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{b.title}</div>
+                <div className="text-xs text-zinc-500">
+                  {b.wordCount} kata · {labelPanjang(b.wordCount)}
+                </div>
+              </div>
+              {b.percent != null ? (
+                <span className="shrink-0 text-right text-xs">
+                  <span className="block font-bold text-amber-600">{b.percent}%</span>
+                  <span className="text-zinc-400">{b.wpm} wpm</span>
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs text-zinc-400">belum</span>
+              )}
+            </button>
+          ),
+        )}
       </div>
     </div>
+  );
+}
+
+/* Item bacaan tipe RINGKASAN (16-20): ditandai ✍️, dinilai guru. */
+function BacaanRingkasanItem({
+  b,
+  pending,
+  onPilih,
+}: {
+  b: BacaanRingkas;
+  pending: boolean;
+  onPilih: (id: string) => void;
+}) {
+  return (
+    <button
+      disabled={pending}
+      onClick={() => onPilih(b.id)}
+      className="flex items-center gap-3 rounded-xl border border-dashed border-violet-300/70 bg-violet-50/30 p-3 text-left transition-colors hover:border-violet-400 hover:bg-violet-50/60 disabled:opacity-50 dark:border-violet-700/60 dark:bg-violet-950/20 dark:hover:border-violet-600"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+        {b.urutan}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate font-medium">{b.title}</span>
+          <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+            ✍️ Ringkasan
+          </span>
+        </div>
+        <div className="text-xs text-zinc-500">
+          {b.wordCount} kata · tulis dengan bahasamu sendiri
+        </div>
+      </div>
+      {!b.ringkasanKirim ? (
+        <span className="shrink-0 text-xs text-zinc-400">belum</span>
+      ) : b.ringkasanSkor != null ? (
+        <span className="shrink-0 text-right text-xs">
+          <span className="block font-bold text-violet-600 dark:text-violet-400">{b.ringkasanSkor}</span>
+          <span className="text-zinc-400">dinilai</span>
+        </span>
+      ) : (
+        <span className="shrink-0 text-right text-xs text-amber-600 dark:text-amber-400">
+          menunggu<br />penilaian
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -480,6 +572,154 @@ function BacaBacaan({
         {pending ? "Menilai…" : "Kumpulkan jawaban ✅"}
       </button>
       <p className="text-center text-xs text-zinc-400">{belum} soal belum dijawab</p>
+    </div>
+  );
+}
+
+/* ===================== RINGKASAN: baca → tulis parafrase → kirim ===================== */
+function TulisRingkasan({
+  ringkasan,
+  onSelesai,
+  onKeluar,
+}: {
+  ringkasan: RingkasanKlien;
+  onSelesai: () => Promise<void>;
+  onKeluar: () => void;
+}) {
+  const [fase, setFase] = useState<"baca" | "tulis">(ringkasan.tersimpan ? "tulis" : "baca");
+  const [teks, setTeks] = useState(ringkasan.tersimpan?.text ?? "");
+  const [terkirim, setTerkirim] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const kata = hitungKataRingkasan(teks);
+  const cukup = kata >= MIN_KATA_RINGKASAN;
+  const nilai = ringkasan.tersimpan;
+
+  async function kirim() {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await submitRingkasan({ passageId: ringkasan.id, text: teks });
+      if (!res.ok) {
+        setError(res.error ?? "Gagal mengirim ringkasan.");
+        return;
+      }
+      setTerkirim(true);
+      await onSelesai();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /* ---- Layar konfirmasi terkirim ---- */
+  if (terkirim) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="as-pop rounded-3xl border border-black/5 bg-gradient-to-b from-violet-50 to-transparent p-6 text-center shadow-lg dark:border-white/10 dark:from-violet-950/30">
+          <div className="text-5xl as-float">📨</div>
+          <p className="mt-2 text-lg font-black">Ringkasan terkirim!</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Ringkasanmu ({kata} kata) sudah tersimpan dan menunggu penilaian guru. Skormu muncul
+            di daftar bacaan setelah dinilai.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-black/10 p-5 dark:border-white/15">
+          <h3 className="mb-2 text-sm font-semibold text-zinc-500">Ringkasan yang kamu kirim</h3>
+          <p className="whitespace-pre-line text-sm leading-relaxed">{teks}</p>
+        </div>
+        <button
+          onClick={onKeluar}
+          className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 py-3 font-bold text-white shadow-lg shadow-violet-500/25 transition-transform hover:scale-[1.02]"
+        >
+          ← Kembali ke daftar bacaan
+        </button>
+      </div>
+    );
+  }
+
+  /* ---- Layar baca ---- */
+  if (fase === "baca") {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onKeluar}
+            className="rounded-lg border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            ←
+          </button>
+          <div className="text-sm text-zinc-500">
+            ✍️ {ringkasan.icon} {ringkasan.jurusanKode} · Level {ringkasan.level} · Ringkasan {ringkasan.urutan}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <h2 className="text-xl font-bold">{ringkasan.title}</h2>
+          <p className="mt-1 text-xs text-zinc-400">
+            {ringkasan.wordCount} kata — baca saksama, lalu ringkas dengan bahasamu sendiri.
+          </p>
+          <p className="mt-4 whitespace-pre-line text-lg leading-relaxed">{ringkasan.text}</p>
+        </div>
+        <button
+          onClick={() => setFase("tulis")}
+          className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 py-3 font-bold text-white shadow-lg shadow-violet-500/25 transition-transform hover:scale-[1.02]"
+        >
+          Selesai membaca, tulis ringkasan ✍️
+        </button>
+      </div>
+    );
+  }
+
+  /* ---- Layar tulis ---- */
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setFase("baca")}
+          className="rounded-lg border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+        >
+          ← Baca lagi
+        </button>
+        <div className="text-sm font-medium text-zinc-500">Ringkasan: {ringkasan.title}</div>
+      </div>
+
+      {nilai?.dinilai && (
+        <div className="rounded-xl border border-emerald-300/60 bg-emerald-50/60 p-3 text-sm dark:border-emerald-700/50 dark:bg-emerald-950/20">
+          <b className="text-emerald-700 dark:text-emerald-400">Sudah dinilai guru: {nilai.score}</b>
+          {nilai.feedback && <span className="text-zinc-500"> — {nilai.feedback}</span>}
+          <div className="mt-1 text-xs text-zinc-400">Menulis ulang akan mengganti ringkasan & minta penilaian baru.</div>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+        <label htmlFor="ringkasanBox" className="text-sm font-medium">
+          Tulis ringkasan bacaan tadi dengan bahasamu sendiri (minimal {MIN_KATA_RINGKASAN} kata)
+        </label>
+        <textarea
+          id="ringkasanBox"
+          value={teks}
+          onChange={(e) => setTeks(e.target.value)}
+          rows={8}
+          placeholder="Tulis ringkasanmu di sini…"
+          className="mt-2 w-full resize-y rounded-xl border border-black/15 bg-transparent p-3 text-sm leading-relaxed outline-none focus:border-violet-400 dark:border-white/20"
+        />
+        <div className={"mt-1 text-right text-xs " + (cukup ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400")}>
+          {kata} kata{cukup ? " ✓" : ` (minimal ${MIN_KATA_RINGKASAN})`}
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button
+        onClick={kirim}
+        disabled={pending || !cukup}
+        className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 py-3 font-bold text-white shadow-lg shadow-violet-500/25 transition-transform hover:scale-[1.02] disabled:scale-100 disabled:opacity-50"
+      >
+        {pending ? "Mengirim…" : "Kirim ringkasan 📨"}
+      </button>
+      <p className="text-center text-xs text-zinc-400">
+        Ringkasan dinilai guru — belum ada skor otomatis.
+      </p>
     </div>
   );
 }

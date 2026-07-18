@@ -13,12 +13,17 @@ import {
   persenSkor,
   badgeSkibaca,
   rekomendasiLevel,
+  hitungKataRingkasan,
   DIAG_URUTAN_SAMPEL,
+  MIN_KATA_RINGKASAN,
   type BacaanKlien,
   type HasilBacaan,
   type DiagBacaanKlien,
   type DiagLevelSkor,
   type HasilDiagnostikBaca,
+  type TipeBacaan,
+  type RingkasanKlien,
+  type RingkasanTersimpan,
 } from "@/lib/skibaca";
 
 /* ===================== HUB: ringkasan per jurusan ===================== */
@@ -36,32 +41,44 @@ export async function muatRingkasanJurusan(): Promise<JurusanRingkas[]> {
   const sesi = await sesiSiswa();
   if (!sesi) throw new Error("Sesi siswa tidak ditemukan. Silakan masuk kembali.");
 
-  const passages = await prisma.skibacaPassage.findMany({
-    select: { id: true, jurusanKode: true, jurusanFull: true, icon: true },
-  });
-  const progres = await prisma.skibacaProgress.findMany({
-    where: { studentId: sesi.studentId },
-    select: { passageId: true, percent: true },
-  });
+  const [passages, progres, ringkasan] = await Promise.all([
+    prisma.skibacaPassage.findMany({
+      select: { id: true, jurusanKode: true, jurusanFull: true, icon: true },
+    }),
+    prisma.skibacaProgress.findMany({
+      where: { studentId: sesi.studentId },
+      select: { passageId: true, percent: true },
+    }),
+    // ringkasan yang sudah dikirim siswa (selesai walau belum dinilai guru)
+    prisma.skibacaSummary.findMany({
+      where: { studentId: sesi.studentId },
+      select: { passageId: true },
+    }),
+  ]);
   const progByPassage = new Map(progres.map((p) => [p.passageId, p.percent]));
+  const ringkasanSet = new Set(ringkasan.map((r) => r.passageId));
 
-  const byKode = new Map<string, JurusanRingkas & { _jumlahSkor: number }>();
+  type Akum = JurusanRingkas & { _jumlahSkor: number; _kuisSelesai: number };
+  const byKode = new Map<string, Akum>();
   for (const p of passages) {
     let j = byKode.get(p.jurusanKode);
     if (!j) {
-      j = { kode: p.jurusanKode, full: p.jurusanFull, icon: p.icon, total: 0, selesai: 0, rataPercent: null, _jumlahSkor: 0 };
+      j = { kode: p.jurusanKode, full: p.jurusanFull, icon: p.icon, total: 0, selesai: 0, rataPercent: null, _jumlahSkor: 0, _kuisSelesai: 0 };
       byKode.set(p.jurusanKode, j);
     }
     j.total++;
     const pct = progByPassage.get(p.id);
     if (pct != null) {
       j.selesai++;
-      j._jumlahSkor += pct;
+      j._kuisSelesai++;
+      j._jumlahSkor += pct; // rata hanya dari kuis (ringkasan dinilai guru & bisa null)
+    } else if (ringkasanSet.has(p.id)) {
+      j.selesai++;
     }
   }
-  return [...byKode.values()].map(({ _jumlahSkor, ...j }) => ({
+  return [...byKode.values()].map(({ _jumlahSkor, _kuisSelesai, ...j }) => ({
     ...j,
-    rataPercent: j.selesai > 0 ? Math.round(_jumlahSkor / j.selesai) : null,
+    rataPercent: _kuisSelesai > 0 ? Math.round(_jumlahSkor / _kuisSelesai) : null,
   }));
 }
 
@@ -69,10 +86,14 @@ export async function muatRingkasanJurusan(): Promise<JurusanRingkas[]> {
 export interface BacaanRingkas {
   id: string;
   urutan: number;
+  tipe: TipeBacaan;
   title: string;
   wordCount: number;
-  percent: number | null;
-  wpm: number | null;
+  percent: number | null; // kuis: skor terbaik
+  wpm: number | null; // kuis: wpm terbaik
+  // ringkasan:
+  ringkasanKirim: boolean; // sudah menulis ringkasan?
+  ringkasanSkor: number | null; // skor guru (null bila belum dinilai)
 }
 export interface LevelRingkas {
   level: number;
@@ -98,20 +119,25 @@ export async function muatJurusan(kode: string): Promise<JurusanDetail> {
   const rows = await prisma.skibacaPassage.findMany({
     where: { jurusanKode: kode },
     orderBy: [{ level: "asc" }, { urutan: "asc" }],
-    select: { id: true, jurusanFull: true, icon: true, level: true, urutan: true, title: true, wordCount: true },
+    select: { id: true, jurusanFull: true, icon: true, level: true, urutan: true, tipe: true, title: true, wordCount: true },
   });
   if (rows.length === 0) throw new Error("Jurusan tidak dikenal.");
 
-  const [progres, diag] = await Promise.all([
+  const [progres, ringkasan, diag] = await Promise.all([
     prisma.skibacaProgress.findMany({
       where: { studentId: sesi.studentId, passage: { jurusanKode: kode } },
       select: { passageId: true, percent: true, wpm: true },
+    }),
+    prisma.skibacaSummary.findMany({
+      where: { studentId: sesi.studentId, passage: { jurusanKode: kode } },
+      select: { passageId: true, score: true, gradedAt: true },
     }),
     prisma.skibacaDiagnostic.findUnique({
       where: { studentId_jurusanKode: { studentId: sesi.studentId, jurusanKode: kode } },
     }),
   ]);
   const prog = new Map(progres.map((p) => [p.passageId, p]));
+  const summ = new Map(ringkasan.map((s) => [s.passageId, s]));
 
   const levels: LevelRingkas[] = [];
   for (const r of rows) {
@@ -121,11 +147,15 @@ export async function muatJurusan(kode: string): Promise<JurusanDetail> {
       levels.push(lv);
     }
     const pr = prog.get(r.id);
+    const sm = summ.get(r.id);
     lv.bacaan.push({
       id: r.id,
       urutan: r.urutan,
+      tipe: r.tipe as TipeBacaan,
       title: r.title,
       wordCount: r.wordCount,
+      ringkasanKirim: sm != null,
+      ringkasanSkor: sm?.gradedAt ? sm.score : null,
       percent: pr?.percent ?? null,
       wpm: pr?.wpm ?? null,
     });
@@ -152,6 +182,7 @@ export async function mulaiBacaan(passageId: string): Promise<BacaanKlien> {
     include: { questions: { orderBy: { urutan: "asc" } } },
   });
   if (!p) throw new Error("Bacaan tidak ditemukan.");
+  if (p.tipe === "ringkasan") throw new Error("Bacaan ini tugas ringkasan, bukan kuis.");
   return {
     id: p.id,
     jurusanKode: p.jurusanKode,
@@ -190,6 +221,7 @@ export async function submitBacaan(input: {
     include: { questions: { orderBy: { urutan: "asc" } } },
   });
   if (!p) return { ok: false, error: "Bacaan tidak ditemukan." };
+  if (p.tipe === "ringkasan") return { ok: false, error: "Bacaan ini tugas ringkasan, bukan kuis." };
 
   const jawab = Array.isArray(input.jawab) ? input.jawab : [];
   let benar = 0;
@@ -238,6 +270,77 @@ export async function submitBacaan(input: {
     ok: true,
     hasil: { benar, total, percent, wpm, detikBaca, badge, koreksi, title: p.title, level: p.level },
   };
+}
+
+/* ===================== RINGKASAN (bacaan 16..20, dinilai guru) ===================== */
+/** Mulai menulis ringkasan: kirim teks bacaan (tanpa soal) + ringkasan siswa sebelumnya bila ada. */
+export async function mulaiRingkasan(passageId: string): Promise<RingkasanKlien> {
+  const sesi = await sesiSiswa();
+  if (!sesi) throw new Error("Sesi siswa tidak ditemukan.");
+  const p = await prisma.skibacaPassage.findUnique({ where: { id: passageId } });
+  if (!p) throw new Error("Bacaan tidak ditemukan.");
+  if (p.tipe !== "ringkasan") throw new Error("Bacaan ini bukan tugas ringkasan.");
+
+  const s = await prisma.skibacaSummary.findUnique({
+    where: { studentId_passageId: { studentId: sesi.studentId, passageId: p.id } },
+  });
+  const tersimpan: RingkasanTersimpan | null = s
+    ? { text: s.text, wordCount: s.wordCount, score: s.score, feedback: s.feedback, dinilai: s.gradedAt != null }
+    : null;
+  return {
+    id: p.id,
+    jurusanKode: p.jurusanKode,
+    jurusanFull: p.jurusanFull,
+    icon: p.icon,
+    level: p.level,
+    urutan: p.urutan,
+    title: p.title,
+    text: p.text,
+    wordCount: p.wordCount,
+    tersimpan,
+  };
+}
+
+export interface SubmitRingkasanHasil {
+  ok: boolean;
+  error?: string;
+  wordCount?: number;
+}
+
+/**
+ * Kirim ringkasan siswa: validasi tipe & minimal kata, simpan (upsert). Menulis ulang
+ * MERESET penilaian guru (skor/feedback/gradedAt → null) karena isinya berubah.
+ * Tidak ada skor otomatis — guru menilai manual di dashboard.
+ */
+export async function submitRingkasan(input: {
+  passageId: string;
+  text: string;
+}): Promise<SubmitRingkasanHasil> {
+  const sesi = await sesiSiswa();
+  if (!sesi) return { ok: false, error: "Sesi siswa habis. Masuk kembali." };
+
+  const p = await prisma.skibacaPassage.findUnique({
+    where: { id: input.passageId },
+    select: { id: true, tipe: true },
+  });
+  if (!p) return { ok: false, error: "Bacaan tidak ditemukan." };
+  if (p.tipe !== "ringkasan") return { ok: false, error: "Bacaan ini bukan tugas ringkasan." };
+
+  const text = (input.text ?? "").trim();
+  const wordCount = hitungKataRingkasan(text);
+  if (wordCount < MIN_KATA_RINGKASAN) {
+    return { ok: false, error: `Ringkasan minimal ${MIN_KATA_RINGKASAN} kata (sekarang ${wordCount}).` };
+  }
+
+  await prisma.skibacaSummary.upsert({
+    where: { studentId_passageId: { studentId: sesi.studentId, passageId: p.id } },
+    create: { studentId: sesi.studentId, passageId: p.id, text, wordCount },
+    update: { text, wordCount, score: null, feedback: null, gradedAt: null },
+  });
+
+  revalidatePath("/siswa/skibaca");
+  revalidatePath("/siswa");
+  return { ok: true, wordCount };
 }
 
 /* ===================== TES DIAGNOSTIK (per jurusan) ===================== */

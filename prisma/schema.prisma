@@ -57,6 +57,7 @@ model Student {
   skibaProfile SkibaProfile?
   skibacaProgress SkibacaProgress[]
   skibacaDiagnostics SkibacaDiagnostic[]
+  skibacaSummaries SkibacaSummary[]
 
   @@index([kelasId])
 }
@@ -207,12 +208,14 @@ model SkibacaPassage {
   jurusanFull String
   icon        String
   level       Int // 1..5
-  urutan      Int // 1..15
+  urutan      Int // 1..20
+  tipe        String            @default("kuis") // "kuis" (1..15) | "ringkasan" (16..20, ditulis siswa & dinilai guru)
   title       String
   text        String
   wordCount   Int
   questions   SkibacaQuestion[]
   progress    SkibacaProgress[]
+  summaries   SkibacaSummary[]
 
   @@unique([jurusanKode, level, urutan])
   @@index([jurusanKode, level])
@@ -242,6 +245,28 @@ model SkibacaProgress {
 
   @@unique([studentId, passageId])
   @@index([studentId])
+}
+
+// Ringkasan/parafrase SKIBACA (bacaan 16..20) yang ditulis siswa dengan bahasanya sendiri.
+// TIDAK dinilai otomatis: guru menilai manual (skor + catatan) di dashboard. Boleh ditulis
+// ulang selama belum/ sudah dinilai (upsert; menulis ulang mereset penilaian guru).
+model SkibacaSummary {
+  id        String         @id @default(cuid())
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+  passage   SkibacaPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId String
+  text      String // ringkasan siswa
+  wordCount Int
+  score     Int? // skor 0..100 dari guru; null = belum dinilai
+  feedback  String? // catatan guru
+  gradedAt  DateTime? // waktu dinilai; null = menunggu penilaian
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([studentId, passageId])
+  @@index([studentId])
+  @@index([gradedAt]) // filter "menunggu penilaian" di dashboard guru
 }
 
 // Hasil Tes Diagnostik SKIBACA per siswa per jurusan (saran level awal, bukan unlock —
