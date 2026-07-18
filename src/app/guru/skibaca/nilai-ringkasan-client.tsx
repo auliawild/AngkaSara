@@ -3,17 +3,20 @@
  * UI guru menilai ringkasan SKIBACA. Filter belum/semua; tiap kartu menampilkan teks asli,
  * poin kunci (acuan), ringkasan siswa, lalu input skor + catatan → nilaiRingkasan.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   muatRingkasanUntukGuru,
   nilaiRingkasan,
   type RingkasanUntukGuru,
 } from "@/server/skibaca-guru";
+import { ikonJurusan, urutkanKelas } from "@/lib/kelas";
 
 type Filter = "belum" | "semua";
+const SEMUA_KELAS = "all";
 
 export default function NilaiRingkasanClient({ awal }: { awal: RingkasanUntukGuru[] }) {
   const [filter, setFilter] = useState<Filter>("belum");
+  const [kelas, setKelas] = useState<string>(SEMUA_KELAS);
   const [daftar, setDaftar] = useState<RingkasanUntukGuru[]>(awal);
   const [pending, setPending] = useState(false);
 
@@ -27,9 +30,29 @@ export default function NilaiRingkasanClient({ awal }: { awal: RingkasanUntukGur
     }
   }, []);
 
+  // Opsi kelas diturunkan dari data yang ada, urut jenjang.
+  const kelasOpsi = useMemo(
+    () => [...new Set(daftar.map((r) => r.kelasLabel))].sort(urutkanKelas),
+    [daftar],
+  );
+  const tampil = useMemo(
+    () => (kelas === SEMUA_KELAS ? daftar : daftar.filter((r) => r.kelasLabel === kelas)),
+    [daftar, kelas],
+  );
+  // Kelompokkan per kelas supaya guru menilai satu kelas sekaligus.
+  const grup = useMemo(() => {
+    const m = new Map<string, RingkasanUntukGuru[]>();
+    for (const r of tampil) {
+      const arr = m.get(r.kelasLabel) ?? [];
+      arr.push(r);
+      m.set(r.kelasLabel, arr);
+    }
+    return [...m.entries()].sort((a, b) => urutkanKelas(a[0], b[0]));
+  }, [tampil]);
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {(["belum", "semua"] as Filter[]).map((f) => (
           <button
             key={f}
@@ -45,29 +68,69 @@ export default function NilaiRingkasanClient({ awal }: { awal: RingkasanUntukGur
             {f === "belum" ? "Menunggu penilaian" : "Semua"}
           </button>
         ))}
-        <span className="text-xs text-zinc-500">{daftar.length} ringkasan</span>
+        <select
+          value={kelas}
+          onChange={(e) => setKelas(e.target.value)}
+          className="rounded-lg border border-black/15 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-white/20"
+        >
+          <option value={SEMUA_KELAS}>🏫 Semua kelas</option>
+          {kelasOpsi.map((k) => (
+            <option key={k} value={k}>
+              {ikonJurusan(k)} {k}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-zinc-500">
+          {tampil.length} ringkasan · {grup.length} kelas
+        </span>
       </div>
 
-      {daftar.length === 0 ? (
+      {tampil.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-black/15 p-8 text-center text-sm text-zinc-500 dark:border-white/20">
           {filter === "belum" ? "Tidak ada ringkasan yang menunggu penilaian. 🎉" : "Belum ada ringkasan."}
         </p>
       ) : (
-        daftar.map((r) => (
-          <KartuNilai
-            key={r.id}
-            r={r}
-            onTersimpan={() => {
-              // di filter "belum", ringkasan yang baru dinilai hilang dari daftar
-              if (filter === "belum") setDaftar((d) => d.filter((x) => x.id !== r.id));
-              else muat("semua");
-            }}
-          />
+        grup.map(([kelasLabel, items]) => (
+          <section key={kelasLabel} className="flex flex-col gap-3">
+            <h2 className="sticky top-0 z-10 rounded-lg bg-blue-50/90 px-3 py-1.5 text-sm font-semibold text-blue-900 backdrop-blur dark:bg-blue-950/70 dark:text-blue-200">
+              <span className="mr-1">{ikonJurusan(kelasLabel)}</span>
+              {kelasLabel}
+              <span className="ml-2 text-xs font-normal text-blue-700/70 dark:text-blue-300/70">
+                {items.length} ringkasan
+              </span>
+            </h2>
+            {items.map((r) => (
+              <KartuNilai
+                key={r.id}
+                r={r}
+                onTersimpan={() => {
+                  // di filter "belum", ringkasan yang baru dinilai hilang dari daftar
+                  if (filter === "belum") setDaftar((d) => d.filter((x) => x.id !== r.id));
+                  else muat("semua");
+                }}
+              />
+            ))}
+          </section>
         ))
       )}
     </div>
   );
 }
+
+// Preset "nilai cepat" (mengikuti ambang klasifikasi) & catatan siap pakai — mempercepat guru menilai.
+const CEPAT = [
+  { v: 55, label: "Perlu Bimbingan", color: "#d1704f" },
+  { v: 70, label: "Cukup", color: "#e0a800" },
+  { v: 82, label: "Baik", color: "#0057ff" },
+  { v: 95, label: "Mahir", color: "#4f9c6a" },
+] as const;
+const CHIP_CATATAN = [
+  "Ide pokok sudah tercakup.",
+  "Ditulis dengan bahasa sendiri, bagus.",
+  "Perlu lebih lengkap.",
+  "Ada poin penting yang terlewat.",
+  "Masih terlalu singkat.",
+];
 
 function KartuNilai({ r, onTersimpan }: { r: RingkasanUntukGuru; onTersimpan: () => void }) {
   const [skor, setSkor] = useState<string>(r.score != null ? String(r.score) : "");
@@ -156,6 +219,26 @@ function KartuNilai({ r, onTersimpan }: { r: RingkasanUntukGuru; onTersimpan: ()
         </div>
       )}
 
+      {/* Nilai cepat */}
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-medium text-zinc-500">Nilai cepat:</span>
+        {CEPAT.map((c) => (
+          <button
+            key={c.v}
+            type="button"
+            onClick={() => setSkor(String(c.v))}
+            className="rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors"
+            style={{
+              borderColor: c.color + "66",
+              color: c.color,
+              backgroundColor: skor === String(c.v) ? c.color + "22" : "transparent",
+            }}
+          >
+            {c.label} · {c.v}
+          </button>
+        ))}
+      </div>
+
       {/* Input nilai */}
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-sm">
@@ -186,6 +269,20 @@ function KartuNilai({ r, onTersimpan }: { r: RingkasanUntukGuru; onTersimpan: ()
         >
           {tersimpan ? "Tersimpan ✓" : pending ? "Menyimpan…" : "Simpan nilai"}
         </button>
+      </div>
+
+      {/* Catatan siap pakai */}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {CHIP_CATATAN.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setFeedback((f) => (f.trim() ? f.trimEnd() + " " + c : c))}
+            className="rounded-full border border-black/10 px-2.5 py-1 text-xs text-zinc-600 hover:bg-black/5 dark:border-white/15 dark:text-zinc-300 dark:hover:bg-white/10"
+          >
+            + {c}
+          </button>
+        ))}
       </div>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
