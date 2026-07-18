@@ -2,11 +2,18 @@ import { headers } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { muatRaportSiswa } from "@/server/laporan";
+import { muatRaportSiswa, muatProgresSiswa } from "@/server/laporan";
 import { BULAN_PANJANG, ikonJurusan } from "@/lib/kelas";
 import { SKIBA_TOTAL_LEVEL, SKIBA_TOTAL_TOPIK } from "@/lib/laporan";
 import { SEKOLAH } from "@/lib/sekolah";
 import CetakTombol from "./cetak-tombol";
+import ProgresChart from "./progres-chart";
+
+const MODES = [
+  { id: "hari", label: "Harian", ket: "14 hari terakhir" },
+  { id: "minggu", label: "Mingguan", ket: "12 minggu terakhir" },
+  { id: "bulan", label: "Bulanan", ket: "12 bulan terakhir" },
+] as const;
 
 export const metadata = { title: "Raport Siswa — AngkaSara" };
 
@@ -31,7 +38,7 @@ export default async function RaportPage({
   searchParams,
 }: {
   params: Promise<{ siswaId: string }>;
-  searchParams: Promise<{ semester?: string }>;
+  searchParams: Promise<{ semester?: string; mode?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   const { siswaId } = await params;
@@ -41,7 +48,8 @@ export default async function RaportPage({
   const d = await muatRaportSiswa({ siswaId, semester: sp.semester });
   if (!d) notFound();
   const { raport: r, semesterLabel } = d;
-  const semQS = `?semester=${d.semesterId}`;
+  const prog = await muatProgresSiswa({ siswaId, mode: sp.mode });
+  const modeKet = MODES.find((m) => m.id === prog?.mode)?.ket ?? "";
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-6 py-8">
@@ -58,6 +66,50 @@ export default async function RaportPage({
         </div>
         <CetakTombol />
       </div>
+
+      {/* ===== Progres latihan harian/mingguan/bulanan (layar saja) ===== */}
+      {prog && (
+        <section className="no-print rounded-xl border border-black/10 p-5 dark:border-white/15">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">📈 Progres Latihan {r.nama}</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Aktivitas latihan SKIBA &amp; SKIBACA · {modeKet}
+              </p>
+            </div>
+            <div className="flex gap-1 rounded-lg bg-black/5 p-1 text-sm dark:bg-white/10">
+              {MODES.map((m) => (
+                <Link
+                  key={m.id}
+                  href={`/guru/laporan/${siswaId}?semester=${d.semesterId}&mode=${m.id}`}
+                  className={
+                    "rounded-md px-3 py-1 transition-colors " +
+                    (prog.mode === m.id
+                      ? "bg-white font-medium shadow-sm dark:bg-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200")
+                  }
+                >
+                  {m.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label="Total Aktivitas" nilai={prog.totalAktivitas} />
+            <StatTile label="Rata Numerasi" nilai={prog.rataNum ?? "—"} warna="#2563eb" />
+            <StatTile label="Rata Literasi" nilai={prog.rataLit ?? "—"} warna="#c9723f" />
+            <StatTile label="Total Poin" nilai={prog.totalPoin} />
+          </div>
+
+          <div className="mt-4">
+            <ProgresChart titik={prog.titik} />
+          </div>
+          <p className="mt-2 text-xs text-zinc-400">
+            Aktif di {prog.bucketAktif} dari {prog.titik.length} periode. Arahkan kursor ke batang untuk rincian.
+          </p>
+        </section>
+      )}
 
       {/* ===== Lembar raport (cetak) ===== */}
       <article className="cetak-raport rounded-xl border border-black/10 bg-white p-8 text-zinc-900 shadow-sm">
@@ -223,6 +275,17 @@ export default async function RaportPage({
         </section>
       </article>
     </main>
+  );
+}
+
+function StatTile({ label, nilai, warna }: { label: string; nilai: number | string; warna?: string }) {
+  return (
+    <div className="rounded-xl border border-black/10 p-4 dark:border-white/15">
+      <div className="text-2xl font-bold" style={warna ? { color: warna } : undefined}>
+        {nilai}
+      </div>
+      <div className="mt-0.5 text-xs text-zinc-500">{label}</div>
+    </div>
   );
 }
 

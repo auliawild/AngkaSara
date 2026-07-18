@@ -21,6 +21,8 @@ import {
   semesterId,
   type Semester,
 } from "@/lib/semester";
+import { agregatProgres, type ProgresData } from "@/lib/progres";
+import type { BucketMode } from "@/lib/kelas";
 
 async function requireStaf(): Promise<void> {
   const s = await auth.api.getSession({ headers: await headers() });
@@ -221,4 +223,33 @@ export async function muatRaportSiswa(params: { siswaId: string; semester?: stri
     semesterId: semesterId(s),
     semesterLabel: labelSemester(s),
   };
+}
+
+const MODE_SAH: BucketMode[] = ["hari", "minggu", "bulan"];
+
+/** Normalisasi mode bucket dari param URL (default mingguan). */
+export function pilihMode(m?: string): BucketMode {
+  return m && (MODE_SAH as string[]).includes(m) ? (m as BucketMode) : "minggu";
+}
+
+/**
+ * Progres latihan satu siswa dibucket harian/mingguan/bulanan (dari PracticeActivity).
+ * Ambil aktivitas ≤ ~400 hari terakhir (cukup untuk jendela terbesar: 12 bulan). Null bila siswa tak ada.
+ */
+export async function muatProgresSiswa(params: { siswaId: string; mode?: string }): Promise<ProgresData | null> {
+  await requireStaf();
+  const st = await prisma.student.findUnique({ where: { id: params.siswaId }, select: { id: true } });
+  if (!st) return null;
+
+  const mode = pilihMode(params.mode);
+  const sejak = new Date();
+  sejak.setDate(sejak.getDate() - 400);
+  const akt = await prisma.practiceActivity.findMany({
+    where: { studentId: st.id, createdAt: { gte: sejak } },
+    select: { createdAt: true, domain: true, score: true, points: true },
+  });
+  return agregatProgres(
+    akt.map((a) => ({ ts: a.createdAt, domain: a.domain, score: a.score, points: a.points ?? 0 })),
+    mode,
+  );
 }

@@ -10,6 +10,32 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — Progres latihan harian/mingguan/bulanan per siswa (guru/admin) — TUNTAS
+
+### ✅ Tampilan progres per anak dibucket waktu (di halaman detail Laporan)
+Permintaan user: progres harian/mingguan/bulanan tiap anak, hanya guru & admin. Ditambahkan
+sebagai bagian di halaman detail siswa `/guru/laporan/[siswaId]` (khusus layar, `no-print`).
+- **Sumber data:** `PracticeActivity` (tiap sesi latihan SKIBA/SKIBACA: createdAt, domain, score, points).
+  Memakai helper bucket yang sudah ada di `lib/kelas.ts` (`bucketKey/bucketLabel/bucketTerakhir`,
+  `BUCKET_JUMLAH` = hari 14 · minggu 12 · bulan 12).
+- **Lib murni + tes** `src/lib/progres.ts`: `agregatProgres(aktivitas, mode, now)` → deret `TitikProgres`
+  per bucket (jumlah num/lit, rata skor num/lit, poin) + ringkasan (totalAktivitas, totalPoin,
+  bucketAktif, rataNum/rataLit). 4 tes (harian/bulanan/kosong).
+- **Server** `src/server/laporan.ts`: `pilihMode` (hari|minggu|bulan, default minggu) + `muatProgresSiswa`
+  ({siswaId, mode}, requireStaf) — ambil PracticeActivity ≤400 hari, agregasi.
+- **UI:** bagian `📈 Progres Latihan` di detail siswa — toggle Harian/Mingguan/Bulanan (Link ?mode=,
+  pertahankan semester), 4 stat tile (total aktivitas/rata num/rata lit/total poin), grafik batang
+  bertumpuk numerasi+literasi `src/app/guru/laporan/[siswaId]/progres-chart.tsx` (server SVG, hover
+  rincian per bucket). `no-print` → tak ikut tercetak di raport.
+- **Akses:** requireStaf (GURU+ADMIN); siswa tak punya akses (tetap di area /guru). Sesuai permintaan.
+- **Verifikasi:** `npm test` **87/87** (+4); `npm run build` sukses (TS bersih); **jalur data DB nyata**
+  via skrip tsx (Budi 2 aktivitas → hari: Jum/Sab 1-1, minggu: Mg29=2, bulan: Jul'26=2; rataNum20 rataLit100
+  poin42, ketiga mode benar); runtime detail `?mode=hari` **307 → /masuk** (kompilasi tanpa error).
+- **Catatan:** tampilan visual saat login staf belum di-e2e (larangan password + screenshot browser
+  timeout) — perlu user cek. Uncommitted di atas `96794ae`.
+
+---
+
 ## 2026-07-18 — Impor Guru & Staf (login NIP) — TUNTAS (perlu restart dev + cek login live)
 
 ### ✅ Impor guru/staf via Excel (Nama, NIP), login staf jadi NIP + password
