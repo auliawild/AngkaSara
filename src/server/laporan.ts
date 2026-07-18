@@ -225,6 +225,37 @@ export async function muatRaportSiswa(params: { siswaId: string; semester?: stri
   };
 }
 
+export interface RaportKelas {
+  kelas: string;
+  semesterId: string;
+  semesterLabel: string;
+  daftar: { id: string; raport: RaportSiswa }[];
+}
+
+/** Raport seluruh siswa aktif satu kelas (untuk cetak sekelas). Null bila kelas tak dikenal. */
+export async function muatRaportKelas(params: { kelas: string; semester?: string }): Promise<RaportKelas | null> {
+  await requireStaf();
+  const s = pilihSemester(params.semester);
+  const kelasRow = await prisma.kelas.findUnique({ where: { label: params.kelas }, select: { label: true } });
+  if (!kelasRow) return null;
+
+  const students = await prisma.student.findMany({
+    where: { aktif: true, kelas: { label: params.kelas } },
+    select: { id: true, nama: true, nisn: true },
+    orderBy: { nama: "asc" },
+  });
+  const map = await kumpulkanRaport(
+    students.map((x) => ({ ...x, kelasLabel: params.kelas })),
+    s,
+  );
+  return {
+    kelas: params.kelas,
+    semesterId: semesterId(s),
+    semesterLabel: labelSemester(s),
+    daftar: students.map((st) => ({ id: st.id, raport: map.get(st.id)! })),
+  };
+}
+
 const MODE_SAH: BucketMode[] = ["hari", "minggu", "bulan"];
 
 /** Normalisasi mode bucket dari param URL (default mingguan). */

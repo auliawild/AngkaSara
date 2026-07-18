@@ -10,6 +10,70 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — Kop resmi · NIP ttd · cetak sekelas · grup kelas ringkasan — TUNTAS
+
+### ✅ Empat permintaan user
+- **Kop raport resmi** `src/lib/sekolah.ts` diisi data asli: `SMK NEGERI 1 BADEGAN PONOROGO`,
+  `Jalan Suyudono No 1 Badegan, Badegan, Ponorogo, Jawa Timur, 63455`, Telp/Faks `0352-751034`,
+  Pos-el `smkn1badegan@gmail.com`. Field placeholder lama (kabupaten/provinsi/npsn/kepalaSekolah/
+  nipKepalaSekolah) DIHAPUS — kop kini 3 baris: nama → alamat → telepon/pos-el.
+- **NIP wali kelas & kepala sekolah:** `tanda-tangan.tsx` di-refactor jadi **context** —
+  `TandaTanganProvider` (state + localStorage `angkasara-ttd-raport`), `PanelTandaTangan` (4 isian:
+  nama+NIP Wali Kelas, nama+NIP Kepsek; `no-print`), `BlokTandaTangan` (tercetak, NIP tampil bila diisi).
+  Satu isian dipakai untuk SEMUA lembar saat cetak sekelas.
+- **Cetak raport sekelas:** lembar raport diekstrak jadi komponen bersama `raport-sheet.tsx`
+  (server; kop+identitas+A/B/C+BlokTandaTangan). Loader baru `muatRaportKelas({kelas,semester})` di
+  `src/server/laporan.ts` (semua siswa aktif sekelas, batch query). Halaman baru
+  `/guru/laporan/cetak-kelas?kelas=&semester=` (**admin-only**) = panel ttd + N lembar; CSS cetak
+  `.cetak-raport + .cetak-raport { break-before: page }` → 1 siswa 1 halaman. Tombol
+  **🖨️ Cetak Raport Sekelas** di header daftar kelas `/guru/laporan` (admin). `cetak-tombol.tsx`
+  dipindah naik agar dipakai bersama; middleware: cetak-kelas ikut `?tab=admin`.
+- **Pengelompokan kelas di Nilai Ringkasan** `nilai-ringkasan-client.tsx`: dropdown filter kelas
+  (opsi diturunkan dari data, urut jenjang) + daftar **dikelompokkan per kelas** dgn heading sticky
+  (ikon jurusan + jumlah). Hitungan "N ringkasan · M kelas".
+- **Verifikasi:** `npm test` **92/92**; `npm run build` sukses (rute `/guru/laporan/cetak-kelas`
+  terdaftar, TS bersih); runtime 3 rute **307** (kompilasi OK); **skrip DB** loader sekelas → 5 lembar
+  untuk X TKJ 1 (termasuk 4 siswa hasil impor contoh). Visual/cetak saat login belum di-e2e (larangan password).
+
+---
+
+## 2026-07-18 — Raport: cetak khusus Admin + isian nama Wali Kelas/Kepsek — TUNTAS
+
+### ✅ Penyempurnaan raport (permintaan user)
+- **Cetak raport hanya Admin:** di `/guru/laporan/[siswaId]`, lembar raport (`<article cetak-raport>`) +
+  tombol Cetak kini `isAdmin` saja. Guru non-admin hanya melihat bagian **Progres** + catatan
+  "Raport semester & cetak hanya tersedia untuk Admin". (Halaman tetap requireStaf; hanya bagian raport di-gate role.)
+- **Yang dicetak = semester saja:** bagian Progres harian/mingguan/bulanan sudah `no-print` (hanya layar),
+  jadi Ctrl+P/window.print() mencetak hanya lembar semester. Tak perlu perubahan.
+- **Isian nama Wali Kelas & Kepala Sekolah:** komponen `tanda-tangan.tsx` (client) — dua input bertanda
+  `no-print`, tersimpan di **localStorage** (`angkasara-ttd-raport`) agar tak diketik ulang; nilai muncul
+  di blok tanda tangan yang **tercetak**. Default Kepsek dari `SEKOLAH.kepalaSekolah`; NIP dari `SEKOLAH.nipKepalaSekolah`.
+- **Verifikasi:** `npm test` **92/92**; `npm run build` sukses (TS bersih); runtime detail guard **307**.
+  Visual per-role & cetak saat login belum di-e2e (larangan password). Uncommitted di atas `79411ff`.
+
+---
+
+## 2026-07-18 — Kelola=admin-only · anti-curang ringkasan · permudah nilai guru — TUNTAS
+
+### ✅ Tiga perbaikan permintaan user
+- **(A) "Kelola" jadi khusus Admin:** kartu **Kelola Siswa** di dasbor kini `role==="ADMIN"` saja (sebelumnya
+  semua staf), sejajar dgn Kelola Guru & Staf. Halaman `/guru/siswa` di-guard ADMIN (redirect guru→/guru);
+  `middleware.ts` arahkan /guru/siswa & /guru/staf ke `?tab=admin`. Dasbor guru non-admin kini hanya:
+  Evaluasi, Laporan Progres, Nilai Ringkasan SKIBACA.
+- **(B) Anti-curang ringkasan** (`src/lib/skibaca.ts` `validasiRingkasan`, murni + 5 tes): min kata +
+  tolak **huruf sama berjejer >3** (regex `(\p{L})\1{3,}`) + **variasi kata** (unik/total ≥0.4 & satu kata
+  ≤max(4,25%)) → cegah siswa menulis kata sama berulang demi target. Dipakai di `submitRingkasan` (server)
+  & live di form siswa (`skibaca-client.tsx` TulisRingkasan: tombol kirim nonaktif + alasan tampil). Ambang
+  longgar agar tulisan wajar (kata fungsi) tetap lolos — diuji `RINGKASAN_BAIK` lolos.
+- **(C) Permudah guru menilai** (`nilai-ringkasan-client.tsx`): baris **Nilai cepat** 4 tombol preset
+  (Perlu Bimbingan 55 · Cukup 70 · Baik 82 · Mahir 95, berwarna klasifikasi) mengisi skor 1 klik + **chip
+  catatan siap pakai** (5 frasa) yang menambah ke kolom catatan.
+- **Verifikasi:** `npm test` **92/92** (+5); `npm run build` sukses (TS bersih); runtime middleware:
+  /guru/siswa & /guru/staf → `?tab=admin`, /guru/laporan → `?tab=guru`. UI visual saat login belum di-e2e
+  (larangan password). Uncommitted di atas `79411ff`.
+
+---
+
 ## 2026-07-18 — Pisahkan akun Guru & Admin (login terpisah + kelola admin) — TUNTAS
 
 ### ✅ Login 3 tab (Siswa/Guru/Admin) + tambah/hapus admin di aplikasi

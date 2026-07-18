@@ -1,18 +1,14 @@
 /**
  * Identitas sekolah untuk kop & tanda tangan raport cetak.
- * ⚠️ Isi nilai placeholder ("—") dengan data resmi sebelum dipakai mencetak raport asli:
- *    npsn, alamat, telepon, kepalaSekolah, nipKepalaSekolah.
+ * Kop tercetak 3 baris: nama (besar) → alamat → telepon/faks + pos-el.
+ * Nama pejabat (Wali Kelas & Kepala Sekolah) beserta NIP diisi lewat form di halaman raport
+ * (tersimpan di browser), bukan di sini — lihat tanda-tangan.tsx.
  */
 export const SEKOLAH = {
-  nama: "SMK NEGERI 1 BADEGAN",
-  kabupaten: "Kabupaten Ponorogo",
-  provinsi: "Jawa Timur",
-  npsn: "—", // TODO: isi NPSN resmi
-  alamat: "—", // TODO: isi alamat lengkap
-  telepon: "—", // TODO: isi nomor telepon
-  email: "—", // TODO: isi email resmi
-  kepalaSekolah: "—", // TODO: isi nama Kepala Sekolah
-  nipKepalaSekolah: "—", // TODO: isi NIP Kepala Sekolah
-  kota: "Ponorogo", // kota untuk baris tanggal tanda tangan
+  nama: "SMK NEGERI 1 BADEGAN PONOROGO",
+  alamat: "Jalan Suyudono No 1 Badegan, Badegan, Ponorogo, Jawa Timur, 63455",
+  telepon: "0352-751034", // Telepon/Faksimile
+  email: "smkn1badegan@gmail.com",
+  kota: "Ponorogo", // dipakai pada baris tanggal tanda tangan
   logo: "/logo-sekolah.webp",
 } as const;

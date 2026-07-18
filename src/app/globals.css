@@ -65,4 +65,6 @@ body {
   /* Cetak lembar raport apa adanya (kop, tabel, tanda tangan) tanpa terpotong tak wajar. */
   .cetak-raport { box-shadow: none !important; border: none !important; }
   .cetak-raport, .cetak-raport * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Cetak sekelas: tiap lembar raport berikutnya mulai di halaman baru. */
+  .cetak-raport + .cetak-raport { break-before: page; page-break-before: always; }
 }

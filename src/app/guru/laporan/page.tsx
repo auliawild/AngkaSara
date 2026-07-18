@@ -15,6 +15,7 @@ export default async function LaporanPage({
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/masuk?tab=staf&next=/guru/laporan");
+  const isAdmin = ((session.user as { role?: string }).role ?? "GURU") === "ADMIN";
 
   const sp = await searchParams;
   const d = await muatLaporanKelas({ kelas: sp.kelas, semester: sp.semester });
@@ -57,7 +58,16 @@ export default async function LaporanPage({
               <span className="mr-1">{ikonJurusan(d.kelas)}</span>
               {d.kelas} · {d.baris.length} siswa
             </h2>
-            <span className="text-xs text-zinc-500">Klik nama untuk raport & cetak</span>
+            {isAdmin ? (
+              <Link
+                href={`/guru/laporan/cetak-kelas?kelas=${encodeURIComponent(d.kelas)}&semester=${d.semesterId}`}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                🖨️ Cetak Raport Sekelas
+              </Link>
+            ) : (
+              <span className="text-xs text-zinc-500">Klik nama untuk melihat progres</span>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
