@@ -10,6 +10,29 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-19 — "Jest worker … exceeding retry limit" di halaman raport = kehabisan RAM — TUNTAS
+
+### ✅ Diagnosis (bukan bug kode)
+- **Gejala:** buka `/guru/laporan/‹siswaId›?semester=2026-1` → overlay Runtime Error
+  *"Jest worker encountered 2 child process exceptions, exceeding retry limit"*; call stack hanya
+  `ChildProcessWorker.initialize`/`_onExit` di `next/dist/compiled/jest-worker` — **nol frame kode kita**.
+- **Sebab:** RAM habis. Diukur saat kejadian: total **3.971 MB (±4 GB)**, bebas **446 MB**
+  (Chrome 15 proses ±583 MB, dev server Next ±455 MB). Worker render (proses anak) mati → Next
+  retry 2× → menyerah & tampilkan pesan pembungkus itu. Pesan asli hanya ada di terminal dev.
+- **Bukti negatif:** skrip tsx ke DB utk siswa tsb OK (siswa ada, NISN 0071230201, 0 PracticeActivity,
+  `agregatProgres` benar di 3 mode); `tsc --noEmit` bersih; test 92/92 & build sukses di commit sama.
+
+### ✅ Mitigasi diterapkan
+- `next.config.ts`: `onDemandEntries` (maxInactiveAge 60 dtk, pagesBufferLength 2) +
+  `experimental.turbopackMemoryLimit` ±1 GB + `experimental.memoryBasedWorkersCount`.
+- `buglog.md` → entri baru **MEM-01** (gejala, bukti negatif, solusi lengkap).
+- **Wajib operasional:** setelah pesan itu muncul, **restart `next dev`** (pool worker rusak permanen
+  walau memori sudah lega); lapangkan RAM dulu (tutup tab Chrome/Word; Docker Desktop jangan dijalankan).
+- **Verifikasi:** `tsc --noEmit` bersih (kedua opsi config sah di NextConfig Next 16.2.10).
+  **Belum di-e2e visual** — perlu user restart dev + login staf (larangan ketik password).
+
+---
+
 ## 2026-07-18 — Rapikan lembar raport (judul 2 baris, tanggal, tanpa garis ttd) — TUNTAS
 
 ### ✅ Penyesuaian tampilan raport (permintaan user)

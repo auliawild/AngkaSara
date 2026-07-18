@@ -5,6 +5,31 @@
 
 ---
 
+## MEM-01 — "Jest worker encountered N child process exceptions, exceeding retry limit"
+- **Gejala:** membuka halaman berat (mis. `/guru/laporan/‹siswaId›?semester=2026-1`) di `next dev`
+  menampilkan overlay **Runtime Error: "Jest worker encountered 2 child process exceptions,
+  exceeding retry limit"** dengan call stack hanya berisi `ChildProcessWorker.initialize` /
+  `_onExit` di `next/dist/compiled/jest-worker` — **tidak ada satu pun frame kode kita**.
+- **Sebab:** **kehabisan RAM**, bukan bug kode. Laptop dev hanya **±4 GB total** dan saat kejadian
+  sisa **±450 MB** (Chrome 15 proses ±580 MB, dev server Next ±455 MB, dll). Next merender Route
+  di proses anak (jest-worker); ketika anak itu mati karena memori, Next mencoba ulang lalu
+  menyerah dan menampilkan pesan pembungkus di atas. Pesan aslinya (kalau ada) hanya muncul di
+  terminal `npm run dev`, bukan di browser — jadi jangan mencari bug di kode halamannya.
+- **Bukti negatif (sudah dicek):** jalur data ke DB untuk siswa tsb jalan normal via skrip tsx
+  (siswa ada, 0 PracticeActivity, `agregatProgres` OK di 3 mode); `tsc --noEmit` bersih;
+  `npm test` & `npm run build` sukses di commit yang sama.
+- **Solusi:**
+  1. **Restart `next dev`.** Setelah "exceeding retry limit" pool worker-nya rusak — halaman akan
+     terus error walau memori sudah lega, sampai server di-restart.
+  2. **Lapangkan RAM sebelum ngoding:** tutup tab Chrome yang tak perlu (WhatsApp Web & Docker
+     Desktop dashboard paling boros), tutup Word/aplikasi lain. Docker Desktop tidak dipakai
+     (dev pakai SQLite — lihat SQLITE-01), jadi pastikan ia tidak berjalan.
+  3. **Konfigurasi hemat memori** (sudah diterapkan di `next.config.ts`):
+     `onDemandEntries` (`maxInactiveAge` 60 dtk, `pagesBufferLength` 2) supaya halaman menganggur
+     dibuang dari memori, plus `experimental.turbopackMemoryLimit` ±1 GB dan
+     `experimental.memoryBasedWorkersCount`.
+- **Status:** ✅ teratasi (operasional + mitigasi config; bukan bug kode).
+
 ## PRISMA7-02 — Model Prisma baru `undefined` di `next dev` yang sudah jalan (client ter-cache)
 - **Gejala:** setelah tambah model (SkibaTopicState) + `prisma migrate/generate`, runtime error
   `TypeError: Cannot read properties of undefined (reading 'findMany')` di `prisma.skibaTopicState`,
