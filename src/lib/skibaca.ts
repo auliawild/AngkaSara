@@ -153,3 +153,45 @@ export function hitungKataRingkasan(text: string): number {
   const t = text.trim();
   return t ? t.split(/\s+/).filter(Boolean).length : 0;
 }
+
+export interface HasilValidasiRingkasan {
+  ok: boolean;
+  error?: string;
+  kata: number;
+}
+
+/**
+ * Validasi ringkasan siswa (anti-curang) — dipakai server saat submit & klien untuk cek langsung:
+ *  - minimal MIN_KATA_RINGKASAN kata;
+ *  - tak boleh ada huruf sama berjejer lebih dari 3 (mis. "aaaa") — cegah isian asal-asalan;
+ *  - variasi kata harus cukup (cegah siswa menulis kata yang sama berulang demi memenuhi target).
+ * Ambang dibuat longgar agar tak menghukum tulisan wajar (kata fungsi spt "yang/dan" tetap lolos).
+ */
+export function validasiRingkasan(text: string): HasilValidasiRingkasan {
+  const t = (text ?? "").trim();
+  const kata = hitungKataRingkasan(t);
+  if (kata < MIN_KATA_RINGKASAN) {
+    return { ok: false, kata, error: `Ringkasan minimal ${MIN_KATA_RINGKASAN} kata (baru ${kata}).` };
+  }
+  if (/(\p{L})\1{3,}/u.test(t)) {
+    return { ok: false, kata, error: 'Ada huruf yang diulang berlebihan (misalnya "aaaa"). Tulis dengan wajar.' };
+  }
+  const words = t.toLowerCase().match(/\p{L}+/gu) ?? [];
+  if (words.length >= 10) {
+    const freq = new Map<string, number>();
+    for (const w of words) freq.set(w, (freq.get(w) ?? 0) + 1);
+    const unik = freq.size;
+    const maxUlang = Math.max(...freq.values());
+    if (unik / words.length < 0.4) {
+      return {
+        ok: false,
+        kata,
+        error: "Terlalu banyak kata yang diulang-ulang. Tulis dengan kalimatmu sendiri yang bervariasi.",
+      };
+    }
+    if (maxUlang > Math.max(4, Math.floor(words.length * 0.25))) {
+      return { ok: false, kata, error: "Satu kata terlalu sering diulang. Variasikan tulisanmu." };
+    }
+  }
+  return { ok: true, kata };
+}

@@ -15,7 +15,9 @@ export default async function KelolaSiswaPage({
   searchParams: Promise<{ kelas?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/masuk?tab=staf&next=/guru/siswa");
+  if (!session) redirect("/masuk?tab=admin&next=/guru/siswa");
+  const role = (session.user as { role?: string }).role ?? "GURU";
+  if (role !== "ADMIN") redirect("/guru");
 
   const kelasList = await prisma.kelas.findMany({
     select: { id: true, label: true, _count: { select: { students: true } } },

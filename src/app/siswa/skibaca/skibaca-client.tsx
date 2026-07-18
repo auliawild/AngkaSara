@@ -21,7 +21,7 @@ import {
 } from "@/server/skibaca";
 import {
   labelPanjang,
-  hitungKataRingkasan,
+  validasiRingkasan,
   MIN_KATA_RINGKASAN,
   type BacaanKlien,
   type HasilDiagnostikBaca,
@@ -591,8 +591,9 @@ function TulisRingkasan({
   const [terkirim, setTerkirim] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const kata = hitungKataRingkasan(teks);
-  const cukup = kata >= MIN_KATA_RINGKASAN;
+  const validasi = validasiRingkasan(teks);
+  const kata = validasi.kata;
+  const cukup = validasi.ok;
   const nilai = ringkasan.tersimpan;
 
   async function kirim() {
@@ -704,8 +705,13 @@ function TulisRingkasan({
           placeholder="Tulis ringkasanmu di sini…"
           className="mt-2 w-full resize-y rounded-xl border border-black/15 bg-transparent p-3 text-sm leading-relaxed outline-none focus:border-violet-400 dark:border-white/20"
         />
-        <div className={"mt-1 text-right text-xs " + (cukup ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400")}>
-          {kata} kata{cukup ? " ✓" : ` (minimal ${MIN_KATA_RINGKASAN})`}
+        <div className="mt-1 flex items-start justify-between gap-3 text-xs">
+          <span className="text-amber-600 dark:text-amber-400">
+            {!validasi.ok && kata >= MIN_KATA_RINGKASAN ? validasi.error : ""}
+          </span>
+          <span className={"whitespace-nowrap " + (cukup ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400")}>
+            {kata} kata{cukup ? " ✓" : ` (minimal ${MIN_KATA_RINGKASAN})`}
+          </span>
         </div>
       </div>
 

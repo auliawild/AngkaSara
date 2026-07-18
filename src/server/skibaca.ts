@@ -13,9 +13,8 @@ import {
   persenSkor,
   badgeSkibaca,
   rekomendasiLevel,
-  hitungKataRingkasan,
+  validasiRingkasan,
   DIAG_URUTAN_SAMPEL,
-  MIN_KATA_RINGKASAN,
   type BacaanKlien,
   type HasilBacaan,
   type DiagBacaanKlien,
@@ -327,10 +326,9 @@ export async function submitRingkasan(input: {
   if (p.tipe !== "ringkasan") return { ok: false, error: "Bacaan ini bukan tugas ringkasan." };
 
   const text = (input.text ?? "").trim();
-  const wordCount = hitungKataRingkasan(text);
-  if (wordCount < MIN_KATA_RINGKASAN) {
-    return { ok: false, error: `Ringkasan minimal ${MIN_KATA_RINGKASAN} kata (sekarang ${wordCount}).` };
-  }
+  const v = validasiRingkasan(text);
+  if (!v.ok) return { ok: false, error: v.error };
+  const wordCount = v.kata;
 
   await prisma.skibacaSummary.upsert({
     where: { studentId_passageId: { studentId: sesi.studentId, passageId: p.id } },

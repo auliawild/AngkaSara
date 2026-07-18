@@ -8,7 +8,41 @@ import {
   rekomendasiLevel,
   hitungKataRingkasan,
   MIN_KATA_RINGKASAN,
+  validasiRingkasan,
 } from "@/lib/skibaca";
+
+/* Ringkasan wajar (>=30 kata, bervariasi) untuk uji lolos. */
+const RINGKASAN_BAIK =
+  "Bacaan ini menceritakan seorang ayah yang bekerja keras memperbaiki mesin mobil tua di bengkel " +
+  "miliknya. Ia mengajarkan anaknya cara merawat kendaraan dengan teliti, sabar, dan penuh tanggung " +
+  "jawab agar mesin tetap awet serta aman ketika digunakan berkendara setiap hari.";
+
+describe("validasiRingkasan (anti-curang)", () => {
+  it("meloloskan ringkasan wajar yang cukup panjang & bervariasi", () => {
+    const v = validasiRingkasan(RINGKASAN_BAIK);
+    expect(v.ok).toBe(true);
+    expect(v.kata).toBeGreaterThanOrEqual(MIN_KATA_RINGKASAN);
+  });
+  it("menolak yang kurang dari batas kata", () => {
+    const v = validasiRingkasan("Mobil ayah biru dan cepat sekali.");
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/minimal/i);
+  });
+  it("menolak huruf sama berjejer lebih dari 3 (aaaa)", () => {
+    const v = validasiRingkasan(RINGKASAN_BAIK + " aaaa");
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/huruf/i);
+  });
+  it("menolak satu kata yang diulang-ulang untuk memenuhi target", () => {
+    const v = validasiRingkasan(Array(40).fill("mobil").join(" "));
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/kata/i);
+  });
+  it("menolak dua kata bergantian yang diulang (variasi terlalu rendah)", () => {
+    const v = validasiRingkasan(Array(20).fill("mobil ayah").join(" "));
+    expect(v.ok).toBe(false);
+  });
+});
 
 describe("skibaca — hitungKata & WPM", () => {
   it("hitungKata mengabaikan spasi ganda & tepi", () => {

@@ -16,8 +16,12 @@ export async function middleware(req: NextRequest) {
     if (!staf) {
       const url = req.nextUrl.clone();
       url.pathname = "/masuk";
-      // Halaman khusus admin → arahkan ke tab Admin; sisanya tab Guru.
-      url.searchParams.set("tab", pathname.startsWith("/guru/staf") ? "admin" : "guru");
+      // Halaman khusus admin (kelola staf & siswa) → tab Admin; sisanya tab Guru.
+      const adminOnly =
+        pathname.startsWith("/guru/staf") ||
+        pathname.startsWith("/guru/siswa") ||
+        pathname.startsWith("/guru/laporan/cetak-kelas");
+      url.searchParams.set("tab", adminOnly ? "admin" : "guru");
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }

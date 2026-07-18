@@ -28,15 +28,17 @@ export default async function GuruPage() {
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/guru/siswa"
-          className="rounded-xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
-        >
-          <h2 className="font-semibold">👥 Kelola Siswa</h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-            Tambah, edit, hapus, dan impor siswa dari Excel.
-          </p>
-        </Link>
+        {role === "ADMIN" && (
+          <Link
+            href="/guru/siswa"
+            className="rounded-xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
+          >
+            <h2 className="font-semibold">👥 Kelola Siswa</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              Tambah, edit, hapus, dan impor siswa dari Excel.
+            </p>
+          </Link>
+        )}
         {role === "ADMIN" && (
           <Link
             href="/guru/staf"
