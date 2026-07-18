@@ -16,7 +16,8 @@ export async function middleware(req: NextRequest) {
     if (!staf) {
       const url = req.nextUrl.clone();
       url.pathname = "/masuk";
-      url.searchParams.set("tab", "staf");
+      // Halaman khusus admin → arahkan ke tab Admin; sisanya tab Guru.
+      url.searchParams.set("tab", pathname.startsWith("/guru/staf") ? "admin" : "guru");
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }

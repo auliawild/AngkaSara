@@ -10,6 +10,30 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — Pisahkan akun Guru & Admin (login terpisah + kelola admin) — TUNTAS
+
+### ✅ Login 3 tab (Siswa/Guru/Admin) + tambah/hapus admin di aplikasi
+Permintaan user ("buat akun guru dan admin terpisah" → keduanya: login terpisah + kelola admin in-app).
+- **Login** `masuk-form.tsx`: tab lama "Guru/Staf" dipecah jadi **Guru** (field NIP → `masukStaf`) &
+  **Admin** (field Email → `masukStaf`). Total 3 tab: Siswa/Guru/Admin. Param `tab`: `admin`→Admin,
+  `guru`/`staf`(alias lama)→Guru, else Siswa. `StafForm`→`GuruForm` + `AdminForm` baru. `masukStaf`
+  tak berubah (deteksi "@" → email, else NIP).
+- **Middleware** `middleware.ts`: /guru/staf* → redirect `?tab=admin`; rute /guru lain → `?tab=guru`.
+  Redirect halaman `/guru/staf` juga diubah ke `?tab=admin`.
+- **Kelola admin** `src/server/staf.ts`: `tambahAdmin({nama,email,password})` (requireAdmin; validasi
+  email + password ≥8; buat User role ADMIN + Account credential hashPassword; email unik). `hapusStaf`
+  diperketat: **tak bisa hapus akun sendiri** & **tak boleh hapus admin terakhir** (count ADMIN ≥1);
+  kini admin JUGA bisa dihapus (dengan penjaga itu). Helper `adminSession()` (kembalikan sesi utk cek id).
+- **UI** `/guru/staf`: komponen `tambah-admin.tsx` (form Nama/Email/Sandi, toggle buka) di atas tabel;
+  `staf-tabel.tsx` — baris admin kini punya tombol **Hapus** (reset-sandi tetap hanya guru ber-NIP).
+- **Verifikasi:** `npm test` **87/87**; `npm run build` sukses (TS bersih); **skrip DB** tambahAdmin →
+  akun role ADMIN, nip null, `verifyPassword(sandi)` true/salah false, cleanup ok; **UI live** di browser
+  pane: `?tab=guru`→field NIP "Masuk sebagai Guru", `?tab=admin`→field Email "Masuk sebagai Admin", 3 tab hadir.
+- **Catatan:** penjaga hapus (self/last-admin) & alur login penuh belum di-e2e via klik (larangan password);
+  logika lurus & tervalidasi build+DB. Uncommitted di atas `a101b88`.
+
+---
+
 ## 2026-07-18 — Progres latihan harian/mingguan/bulanan per siswa (guru/admin) — TUNTAS
 
 ### ✅ Tampilan progres per anak dibucket waktu (di halaman detail Laporan)

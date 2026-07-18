@@ -14,16 +14,58 @@ import { prisma } from "@/lib/db";
 import { parseStaf } from "@/lib/excel-staf";
 import { hitungImporStaf, emailDariNip, NIP_RE, type ImporStafLaporan } from "@/lib/impor-staf";
 
-async function requireAdmin(): Promise<void> {
+/** Pastikan sesi ADMIN; kembalikan sesinya (butuh id utk cegah hapus diri sendiri). */
+async function adminSession() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) throw new Error("Sesi staf tidak ditemukan. Silakan masuk kembali.");
   const role = (session.user as { role?: string }).role ?? "GURU";
   if (role !== "ADMIN") throw new Error("Hanya Admin yang boleh mengelola guru/staf.");
+  return session;
 }
+
+async function requireAdmin(): Promise<void> {
+  await adminSession();
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface AksiResult {
   ok: boolean;
   error?: string;
+}
+
+/** Tambah satu akun ADMIN (login pakai email + password). Terpisah dari impor guru (yang selalu GURU). */
+export async function tambahAdmin(input: { nama: string; email: string; password: string }): Promise<AksiResult> {
+  await requireAdmin();
+  const nama = input.nama.trim().replace(/\s+/g, " ");
+  const email = input.email.trim().toLowerCase();
+  const password = input.password ?? "";
+  if (!nama) return { ok: false, error: "Nama wajib diisi." };
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "Email tidak valid." };
+  if (password.length < 8) return { ok: false, error: "Kata sandi minimal 8 karakter." };
+  if (await prisma.user.findUnique({ where: { email }, select: { id: true } }))
+    return { ok: false, error: "Email sudah dipakai." };
+
+  const now = new Date();
+  const id = randomUUID();
+  await prisma.$transaction([
+    prisma.user.create({
+      data: { id, name: nama, email, emailVerified: true, role: "ADMIN", createdAt: now, updatedAt: now },
+    }),
+    prisma.account.create({
+      data: {
+        id: randomUUID(),
+        accountId: id,
+        providerId: "credential",
+        userId: id,
+        password: await hashPassword(password),
+        createdAt: now,
+        updatedAt: now,
+      },
+    }),
+  ]);
+  revalidatePath("/guru/staf");
+  return { ok: true };
 }
 
 /** Impor massal guru/staf dari .xlsx/.csv. Idempoten terhadap NIP (duplikat dilewati). */
@@ -77,12 +119,19 @@ export async function imporStaf(formData: FormData): Promise<ImporStafLaporan> {
   return laporan;
 }
 
-/** Hapus satu akun guru (beserta sesi & akun kredensialnya via cascade). ADMIN tak bisa dihapus di sini. */
+/**
+ * Hapus satu akun guru/admin (beserta sesi & kredensialnya via cascade). Penjaga:
+ * tak bisa hapus akun sendiri, dan tak boleh menghapus admin terakhir (harus tersisa ≥1 admin).
+ */
 export async function hapusStaf(userId: string): Promise<AksiResult> {
-  await requireAdmin();
+  const s = await adminSession();
+  if (userId === s.user.id) return { ok: false, error: "Tidak bisa menghapus akun sendiri." };
   const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!u) return { ok: false, error: "Akun tidak ditemukan." };
-  if (u.role === "ADMIN") return { ok: false, error: "Akun Admin tidak bisa dihapus dari sini." };
+  if (u.role === "ADMIN") {
+    const jml = await prisma.user.count({ where: { role: "ADMIN" } });
+    if (jml <= 1) return { ok: false, error: "Minimal harus ada 1 admin." };
+  }
   await prisma.user.delete({ where: { id: userId } });
   revalidatePath("/guru/staf");
   return { ok: true };

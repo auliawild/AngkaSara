@@ -4,13 +4,14 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import ImporStafPanel from "./impor-staf-panel";
+import TambahAdmin from "./tambah-admin";
 import StafTabel from "./staf-tabel";
 
 export const metadata = { title: "Kelola Guru & Staf — AngkaSara" };
 
 export default async function KelolaStafPage() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/masuk?tab=staf&next=/guru/staf");
+  if (!session) redirect("/masuk?tab=admin&next=/guru/staf");
   const role = (session.user as { role?: string }).role ?? "GURU";
   if (role !== "ADMIN") redirect("/guru");
 
@@ -35,6 +36,8 @@ export default async function KelolaStafPage() {
       </header>
 
       <ImporStafPanel />
+
+      <TambahAdmin />
 
       <StafTabel data={users.map((u) => ({ id: u.id, nama: u.name, nip: u.nip, role: u.role }))} />
     </main>

@@ -5,13 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { masukSiswa } from "@/server/student-auth";
 import { masukStaf } from "@/server/staf-auth";
 
-type Tab = "siswa" | "staf";
+type Tab = "siswa" | "guru" | "admin";
 
 export default function MasukForm() {
   const params = useSearchParams();
   const router = useRouter();
   const next = params.get("next");
-  const [tab, setTab] = useState<Tab>(params.get("tab") === "staf" ? "staf" : "siswa");
+  const initTab = params.get("tab");
+  const [tab, setTab] = useState<Tab>(
+    initTab === "admin" ? "admin" : initTab === "guru" || initTab === "staf" ? "guru" : "siswa",
+  );
 
   return (
     <div className="as-pop w-full max-w-sm rounded-3xl border border-black/5 bg-white/80 p-6 shadow-xl shadow-violet-500/10 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/80">
@@ -34,19 +37,24 @@ export default function MasukForm() {
         </p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+      <div className="mb-6 grid grid-cols-3 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
         <TabBtn active={tab === "siswa"} onClick={() => setTab("siswa")}>
           🧑‍🎓 Siswa
         </TabBtn>
-        <TabBtn active={tab === "staf"} onClick={() => setTab("staf")}>
-          🧑‍🏫 Guru / Staf
+        <TabBtn active={tab === "guru"} onClick={() => setTab("guru")}>
+          🧑‍🏫 Guru
+        </TabBtn>
+        <TabBtn active={tab === "admin"} onClick={() => setTab("admin")}>
+          🛡️ Admin
         </TabBtn>
       </div>
 
       {tab === "siswa" ? (
         <SiswaForm next={next} router={router} />
+      ) : tab === "guru" ? (
+        <GuruForm next={next} router={router} />
       ) : (
-        <StafForm next={next} router={router} />
+        <AdminForm next={next} router={router} />
       )}
     </div>
   );
@@ -115,7 +123,7 @@ function SiswaForm({ next, router }: FormProps) {
   );
 }
 
-function StafForm({ next, router }: FormProps) {
+function GuruForm({ next, router }: FormProps) {
   const [nip, setNip] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -166,9 +174,68 @@ function StafForm({ next, router }: FormProps) {
         disabled={loading || !nip || !password}
         className="mt-2 rounded-lg bg-zinc-900 py-2.5 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
       >
-        {loading ? "Masuk…" : "Masuk sebagai Staf"}
+        {loading ? "Masuk…" : "Masuk sebagai Guru"}
       </button>
-      <p className="text-center text-xs text-zinc-400">Sandi awal = NIP. Admin dapat memakai email.</p>
+      <p className="text-center text-xs text-zinc-400">Sandi awal = NIP (dari admin).</p>
+    </form>
+  );
+}
+
+function AdminForm({ next, router }: FormProps) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const res = await masukStaf(email, password);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error ?? "Email atau kata sandi salah.");
+      return;
+    }
+    router.push(next && next.startsWith("/guru") ? next : "/guru");
+    router.refresh();
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <label className="text-sm font-medium" htmlFor="email">
+        Email
+      </label>
+      <input
+        id="email"
+        type="email"
+        autoComplete="username"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="admin@sekolah.sch.id"
+        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
+      />
+      <label className="text-sm font-medium" htmlFor="admin-password">
+        Kata sandi
+      </label>
+      <input
+        id="admin-password"
+        type="password"
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="••••••••"
+        className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
+      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button
+        type="submit"
+        disabled={loading || !email || !password}
+        className="mt-2 rounded-lg bg-zinc-900 py-2.5 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+      >
+        {loading ? "Masuk…" : "Masuk sebagai Admin"}
+      </button>
+      <p className="text-center text-xs text-zinc-400">Khusus admin sekolah.</p>
     </form>
   );
 }
