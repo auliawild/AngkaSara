@@ -19,6 +19,7 @@ import {
   rentangSemester,
   semesterDari,
   semesterId,
+  tahunAjaran,
   type Semester,
 } from "@/lib/semester";
 import { agregatProgres, type ProgresData } from "@/lib/progres";
@@ -202,6 +203,7 @@ export interface RaportDetail {
   raport: RaportSiswa;
   semesterId: string;
   semesterLabel: string;
+  tahunAjaran: string; // "2026/2027"
 }
 
 /** Raport lengkap satu siswa untuk satu semester (untuk halaman detail & cetak). Null bila siswa tak ada. */
@@ -222,6 +224,7 @@ export async function muatRaportSiswa(params: { siswaId: string; semester?: stri
     raport: raport.get(st.id)!,
     semesterId: semesterId(s),
     semesterLabel: labelSemester(s),
+    tahunAjaran: tahunAjaran(s),
   };
 }
 
@@ -229,6 +232,7 @@ export interface RaportKelas {
   kelas: string;
   semesterId: string;
   semesterLabel: string;
+  tahunAjaran: string; // "2026/2027"
   daftar: { id: string; raport: RaportSiswa }[];
 }
 
@@ -252,6 +256,7 @@ export async function muatRaportKelas(params: { kelas: string; semester?: string
     kelas: params.kelas,
     semesterId: semesterId(s),
     semesterLabel: labelSemester(s),
+    tahunAjaran: tahunAjaran(s),
     daftar: students.map((st) => ({ id: st.id, raport: map.get(st.id)! })),
   };
 }

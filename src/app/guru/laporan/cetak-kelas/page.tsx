@@ -54,7 +54,7 @@ export default async function CetakKelasPage({
         <TandaTanganProvider>
           <PanelTandaTangan />
           {d.daftar.map((x) => (
-            <RaportSheet key={x.id} r={x.raport} semesterLabel={d.semesterLabel} />
+            <RaportSheet key={x.id} r={x.raport} semesterLabel={d.semesterLabel} tahunAjaran={d.tahunAjaran} />
           ))}
         </TandaTanganProvider>
       )}

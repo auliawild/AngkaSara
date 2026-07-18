@@ -14,8 +14,21 @@ export interface DataTtd {
   waliNip: string;
   kepala: string;
   kepalaNip: string;
+  tanggal: string; // ISO "YYYY-MM-DD" — tanggal yang tercetak di raport
 }
-const KOSONG: DataTtd = { wali: "", waliNip: "", kepala: "", kepalaNip: "" };
+const KOSONG: DataTtd = { wali: "", waliNip: "", kepala: "", kepalaNip: "", tanggal: "" };
+
+const p2 = (n: number) => String(n).padStart(2, "0");
+function isoHariIni(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+/** "2026-07-18" → "18 Juli 2026"; string kosong/salah → "". */
+function formatTanggal(iso: string): string {
+  const [y, m, d] = (iso || "").split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
 
 const Ctx = createContext<{ data: DataTtd; set: (p: Partial<DataTtd>) => void }>({
   data: KOSONG,
@@ -27,12 +40,15 @@ export function TandaTanganProvider({ children }: { children: ReactNode }) {
   const [siap, setSiap] = useState(false);
 
   useEffect(() => {
+    let awal: DataTtd = { ...KOSONG };
     try {
       const raw = localStorage.getItem(KUNCI);
-      if (raw) setData({ ...KOSONG, ...(JSON.parse(raw) as Partial<DataTtd>) });
+      if (raw) awal = { ...awal, ...(JSON.parse(raw) as Partial<DataTtd>) };
     } catch {
       /* abaikan */
     }
+    if (!awal.tanggal) awal.tanggal = isoHariIni(); // default: hari ini
+    setData(awal);
     setSiap(true);
   }, []);
 
@@ -80,6 +96,10 @@ export function PanelTandaTangan() {
           <span className={lab}>NIP Kepala Sekolah</span>
           <input className={inp} value={data.kepalaNip} onChange={(e) => set({ kepalaNip: e.target.value })} placeholder="NIP kepala sekolah" />
         </label>
+        <label className="text-sm">
+          <span className={lab}>Tanggal Raport</span>
+          <input type="date" className={inp} value={data.tanggal} onChange={(e) => set({ tanggal: e.target.value })} />
+        </label>
       </div>
     </section>
   );
@@ -87,25 +107,27 @@ export function PanelTandaTangan() {
 
 const GARIS = "( ................................ )";
 
-/** Blok tanda tangan yang tercetak di tiap lembar raport. */
-export function BlokTandaTangan({ kota, tanggal }: { kota: string; tanggal: string }) {
+/** Blok tanda tangan yang tercetak di tiap lembar raport (tanggal & nama dari isian). */
+export function BlokTandaTangan({ kota }: { kota: string }) {
   const { data } = useContext(Ctx);
+  const tgl = formatTanggal(data.tanggal);
   return (
     <section className="mt-8 grid grid-cols-2 gap-6 text-sm">
       <div className="text-center">
         <p>Mengetahui,</p>
         <p>Wali Kelas</p>
         <div className="h-16" />
-        <p className="border-t border-zinc-400 pt-1 font-semibold">{data.wali.trim() || GARIS}</p>
+        <p className="font-semibold">{data.wali.trim() || GARIS}</p>
         {data.waliNip.trim() && <p className="text-xs text-zinc-600">NIP. {data.waliNip.trim()}</p>}
       </div>
       <div className="text-center">
         <p>
-          {kota}, {tanggal}
+          {kota}
+          {tgl ? `, ${tgl}` : ""}
         </p>
         <p>Kepala Sekolah</p>
         <div className="h-16" />
-        <p className="border-t border-zinc-400 pt-1 font-semibold">{data.kepala.trim() || GARIS}</p>
+        <p className="font-semibold">{data.kepala.trim() || GARIS}</p>
         {data.kepalaNip.trim() && <p className="text-xs text-zinc-600">NIP. {data.kepalaNip.trim()}</p>}
       </div>
     </section>

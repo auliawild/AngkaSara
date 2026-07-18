@@ -10,6 +10,25 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-18 — Rapikan lembar raport (judul 2 baris, tanggal, tanpa garis ttd) — TUNTAS
+
+### ✅ Penyesuaian tampilan raport (permintaan user)
+- **Judul 2 baris:** "Laporan Hasil Belajar" / "Literasi & Numerasi" (sebelumnya 1 baris dgn em-dash).
+- **Baris semester dihapus:** subjudul kini hanya **"Tahun Ajaran 2026/2027"** (dulu "Semester Ganjil,
+  Tahun Ajaran …"). `tahunAjaran` ditambahkan ke `RaportDetail` & `RaportKelas` (server/laporan.ts) lalu
+  diteruskan sbg prop ke `RaportSheet` — tidak di-regex dari label. **Catatan:** baris identitas
+  "Semester: Ganjil 2026/2027" SENGAJA dipertahankan (field data, bukan judul) — hapus bila user minta.
+- **Ukuran huruf dirapikan:** kop nama `text-lg` (dulu xl) + alamat `text-xs` + telp `text-[11px]`,
+  logo 68px, `leading-snug`; judul dokumen `text-base` bold uppercase `tracking-wider`; tahun ajaran `text-sm`.
+- **Garis di atas nama pejabat dihapus** (`border-t border-zinc-400` dibuang) — nama & NIP tampil polos.
+- **Pilihan tanggal raport:** `DataTtd.tanggal` (ISO) + input `type="date"` di `PanelTandaTangan`
+  (default hari ini, ikut tersimpan di localStorage); `BlokTandaTangan` memformat ke "18 Juli 2026"
+  (`formatTanggal`) dan tak lagi menerima prop `tanggal` (helper `tanggalCetak` dihapus).
+- **Verifikasi:** `npm test` **92/92**; `npm run build` sukses (TS bersih); runtime kedua rute raport **307**.
+  Visual/cetak saat login belum di-e2e (larangan password). Uncommitted di atas `5899dce`.
+
+---
+
 ## 2026-07-18 — Kop resmi · NIP ttd · cetak sekelas · grup kelas ringkasan — TUNTAS
 
 ### ✅ Empat permintaan user

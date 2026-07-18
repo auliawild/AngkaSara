@@ -103,7 +103,7 @@ export default async function RaportPage({
       {isAdmin && (
         <TandaTanganProvider>
           <PanelTandaTangan />
-          <RaportSheet r={r} semesterLabel={semesterLabel} />
+          <RaportSheet r={r} semesterLabel={semesterLabel} tahunAjaran={d.tahunAjaran} />
         </TandaTanganProvider>
       )}
     </main>

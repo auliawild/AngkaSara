@@ -24,32 +24,38 @@ function deskripsiNaratif(nama: string, total: number | null, klasLabel?: string
   return `${nama} masih memerlukan bimbingan (${klasLabel}). Perlu pendampingan lebih intensif serta latihan rutin literasi & numerasi.`;
 }
 
-export const tanggalCetak = () =>
-  new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-
-export default function RaportSheet({ r, semesterLabel }: { r: RaportSiswa; semesterLabel: string }) {
+export default function RaportSheet({
+  r,
+  semesterLabel,
+  tahunAjaran,
+}: {
+  r: RaportSiswa;
+  semesterLabel: string;
+  tahunAjaran: string;
+}) {
   return (
     <article className="cetak-raport rounded-xl border border-black/10 bg-white p-8 text-zinc-900 shadow-sm">
       {/* Kop sekolah */}
-      <header className="flex items-center gap-4 border-b-2 border-zinc-800 pb-4">
+      <header className="flex items-center gap-4 border-b-2 border-zinc-800 pb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={SEKOLAH.logo} alt="Logo sekolah" width={72} height={72} className="h-18 w-18 object-contain" />
-        <div className="flex-1 text-center">
-          <h1 className="text-xl font-black tracking-wide">{SEKOLAH.nama}</h1>
-          <p className="text-sm">{SEKOLAH.alamat}</p>
-          <p className="text-xs text-zinc-600">
+        <img src={SEKOLAH.logo} alt="Logo sekolah" width={68} height={68} className="h-17 w-17 object-contain" />
+        <div className="flex-1 text-center leading-snug">
+          <h1 className="text-lg font-black tracking-wide">{SEKOLAH.nama}</h1>
+          <p className="text-xs">{SEKOLAH.alamat}</p>
+          <p className="text-[11px] text-zinc-600">
             Telepon/Faksimile {SEKOLAH.telepon}, Pos-el : {SEKOLAH.email}
           </p>
         </div>
-        <div className="w-18" />
+        <div className="w-17" />
       </header>
 
-      <h2 className="mt-4 text-center text-base font-bold uppercase tracking-wide">
-        Laporan Hasil Belajar — Literasi &amp; Numerasi
+      {/* Judul dokumen — dua baris */}
+      <h2 className="mt-5 text-center text-base font-bold uppercase leading-snug tracking-wider">
+        Laporan Hasil Belajar
+        <br />
+        Literasi &amp; Numerasi
       </h2>
-      <p className="text-center text-sm text-zinc-600">
-        Semester {semesterLabel.replace(/ (\d)/, ", Tahun Ajaran $1")}
-      </p>
+      <p className="mt-1 text-center text-sm text-zinc-600">Tahun Ajaran {tahunAjaran}</p>
 
       {/* Identitas */}
       <section className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
@@ -165,7 +171,7 @@ export default function RaportSheet({ r, semesterLabel }: { r: RaportSiswa; seme
         <p className="mt-1 text-sm text-zinc-700">{deskripsiNaratif(r.nama, r.cp.total, r.cp.klas?.label)}</p>
       </section>
 
-      <BlokTandaTangan kota={SEKOLAH.kota} tanggal={tanggalCetak()} />
+      <BlokTandaTangan kota={SEKOLAH.kota} />
     </article>
   );
 }
