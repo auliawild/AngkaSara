@@ -56,3 +56,13 @@ body {
   .as-float, .as-pop, .as-blob { animation: none; }
   .as-lift { transition: none; }
 }
+
+/* ===== Cetak (raport) ===== */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  .no-print { display: none !important; }
+  body { background: #fff !important; color: #111 !important; }
+  /* Cetak lembar raport apa adanya (kop, tabel, tanda tangan) tanpa terpotong tak wajar. */
+  .cetak-raport { box-shadow: none !important; border: none !important; }
+  .cetak-raport, .cetak-raport * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

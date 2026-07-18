@@ -3,9 +3,48 @@
 > Log kronologis. Entri terbaru di ATAS. Tiap langkah selesai dicatat di sini supaya
 > sesi Claude berikutnya langsung paham posisi. Format tanggal: YYYY-MM-DD.
 
-Status keseluruhan: **Phase 3 — SKIBACA tuntas & terverifikasi. Ketiga fase inti (Phase 1–3) SELESAI.**
+Status keseluruhan: **Phase 3 — SKIBACA tuntas & terverifikasi. Ketiga fase inti (Phase 1–3) SELESAI.
+Tambahan: Laporan Progres & Raport cetak (guru/admin) SELESAI.**
 
 Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · ⛔ terblokir
+
+---
+
+## 2026-07-18 — Laporan Progres siswa & Raport siap cetak (guru/admin) — TUNTAS
+
+### ✅ Rekap progres per siswa/per kelas + raport semester siap cetak
+Fitur baru atas permintaan user. **Tanpa perubahan skema DB** — semua dibaca dari tabel yang ada.
+Akses dibatasi staf (`requireStaf` → mencakup GURU **dan** ADMIN), jadi "hanya guru & admin bisa
+melihat/mencetak" otomatis terpenuhi.
+- **Keputusan user:** (1) Nilai AKHIR raport = **Check Point saja** (asesmen formal bulanan);
+  SKIBA Math & SKIBACA = capaian latihan mandiri pendukung. (2) Format cetak = **kop sekolah +
+  logo + blok tanda tangan** (Wali Kelas & Kepala Sekolah).
+- **Semester** (`src/lib/semester.ts`, murni + tes): Ganjil Jul–Des / Genap Jan–Jun; tahun ajaran
+  (`2026/2027`), id URL `2026-1`/`2026-2`, `daftarSemester` (turun dari periode Check Point, selalu
+  sertakan semester berjalan; urut kronologis — Ganjil > Genap tahun sama).
+- **Agregasi** (`src/lib/laporan.ts`, murni + tes): `agregatCheckpoint` (rata numerasi/literasi/
+  total + klasifikasi + perBulan), `agregatSkiba` (level selesai/200, topik tuntas/10, poin),
+  `agregatSkibaca` (bacaan selesai, rata skor kuis, WPM, ringkasan dinilai), `bangunRaport` +
+  `barisDariRaport` (baris ringkas tabel kelas). Rata pakai Math.round (konsisten [[evaluasi]]).
+- **Identitas sekolah** `src/lib/sekolah.ts` untuk kop/ttd — **berisi placeholder "—"** (npsn,
+  alamat, kepalaSekolah, NIP dll) yang HARUS diisi user sebelum cetak resmi.
+- **Server** `src/server/laporan.ts` (auth staf): `muatOpsiLaporan` (kelas+semester), `muatLaporanKelas`
+  (batch query by studentId untuk 1 kelas), `muatRaportSiswa` (1 siswa). Check Point difilter per
+  periode semester; SKIBA/SKIBACA snapshot kumulatif; keaktifan latihan dari `practiceActivity.groupBy`
+  (domain) dalam rentang tanggal semester.
+- **UI:** `/guru/laporan` (filter kelas+semester → tabel progres siswa, wajib pilih kelas), `/guru/laporan/
+  [siswaId]` (lembar raport: kop+logo, identitas, tabel Check Point per bulan+rata+klasifikasi, capaian
+  SKIBA/SKIBACA, catatan naratif per klasifikasi, ttd) + `cetak-tombol.tsx` (window.print). Print CSS di
+  `globals.css` (`@media print`: `@page A4`, `.no-print` disembunyikan, `.cetak-raport` color-exact).
+  Kartu "📄 Laporan Progres" di `/guru`.
+- **Verifikasi:** `npm test` **77/77** (+16); `npm run build` sukses (rute `/guru/laporan` &
+  `/guru/laporan/[siswaId]` terdaftar, TS bersih); **jalur data thd DB nyata** via skrip tsx sekali-pakai
+  (query CheckPoint/SKIBA/SKIBACA/PracticeActivity groupBy + agregasi) → output benar utk 1 siswa (Budi
+  X TKJ 1: CP 1bln, SKIBA 1lv, SKIBACA 1, akt 2); **runtime** dev server: kedua route HMR-kompilasi &
+  **guard 307 → /masuk** saat belum login.
+- **Catatan:** tampilan visual raport & hasil CETAK saat login staf **belum di-e2e** (larangan ketik
+  password login staf) — perlu dicek user (login guru/admin → Laporan → pilih siswa → 🖨️ Cetak).
+  Isi dulu placeholder di `src/lib/sekolah.ts`. Uncommitted di atas `11b4d41`.
 
 ---
 
