@@ -97,6 +97,16 @@ export default async function SiswaPage() {
           />
 
           <ModuleCard
+            href="/siswa/peringkat"
+            emoji="🏆"
+            title="Papan Peringkat"
+            kepanjangan="Gabungan SKIBA Math + SKIBACA"
+            desc="Lihat posisimu di kelas dan di seluruh sekolah. Ayo naik peringkat!"
+            gradient="from-rose-500 to-pink-600"
+            cta={<CtaPill label="Lihat" />}
+          />
+
+          <ModuleCard
             href="/siswa/checkpoint"
             emoji="📋"
             title={`Check Point ${bulan}`}

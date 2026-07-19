@@ -69,6 +69,15 @@ export default async function GuruPage() {
           </p>
         </Link>
         <Link
+          href="/guru/peringkat"
+          className="rounded-xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
+        >
+          <h2 className="font-semibold">🏆 Peringkat Gabungan</h2>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+            Ranking SKIBA Math + SKIBACA: seluruh siswa, per kelas, dan antar kelas.
+          </p>
+        </Link>
+        <Link
           href="/guru/skibaca"
           className="rounded-xl border border-black/10 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/15 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
         >

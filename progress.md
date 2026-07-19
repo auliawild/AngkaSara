@@ -10,6 +10,54 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-19 — Peringkat gabungan SKIBA Math + SKIBACA (seluruh siswa, per kelas, antar kelas) — TUNTAS
+
+### ✅ Keputusan user (sebelum dikerjakan)
+- **Rumus: seimbang 50:50** antar modul, dan di dalam tiap modul 50% capaian + 50% mutu.
+- **Akses: guru/admin + siswa** (guru lihat rekap penuh, siswa lihat top 20 + posisi dirinya).
+- **Periode: kumulatif** (snapshot capaian, bukan per semester).
+
+### ✅ Rumus (di `src/lib/peringkat.ts`, murni & diuji)
+```
+nilaiSkiba   = 50 × (level arena selesai / 200) + 50 × (rata skor NUMERASI / 100)
+nilaiSkibaca = 50 × (bacaan kuis selesai / 75) + 50 × (rata skor kuis / 100)
+nilai        = (nilaiSkiba + nilaiSkibaca) / 2        → 0..100, dibulatkan 1 desimal
+```
+- Denominator: `SKIBA_TOTAL_LEVEL`=200 (10 topik × 20), `SKIBACA_TOTAL_KUIS`=75 (5 level × 15) per jurusan.
+- Seri **berbagi nomor peringkat** (1,1,3); penentu urutan seri: aktivitas terbanyak → nama A→Z.
+- `susunPeringkatKelas` (antar kelas): rata memakai **seluruh** siswa kelas termasuk yang bernilai 0,
+  supaya kelas dengan partisipasi rendah tidak diuntungkan.
+- `medali(peringkat, nilai)` — 🥇🥈🥉 hanya untuk nilai > 0 (lihat bug di bawah).
+
+### ✅ Server & UI
+- `src/server/peringkat.ts`: `muatPeringkatSekolah` (requireStaf → siswa+antarkelas+kelasOpsi) dan
+  `muatPeringkatSiswa` (sesi siswa → top 20 sekolah & kelas + posisi sendiri). Agregasi berat pakai
+  `groupBy` (`skibacaProgress`, `practiceActivity`) — hanya `skibaTopicState` yang ditarik barisnya
+  (butuh panjang array `progress`). Satu kali ambil semua siswa; penyaringan kelas di memori supaya
+  ketiga sudut pandang konsisten. TIDAK menambah tabel/migrasi apa pun.
+- `/guru/peringkat` (+`filter.tsx`, `tabel.tsx`): 3 lingkup — 🏫 Seluruh Siswa · 👥 Per Kelas (dropdown,
+  nomor peringkat dihitung ulang dalam kelas) · 🏆 Antar Kelas. Ada boks penjelasan cara nilai dihitung.
+- `/siswa/peringkat`: hero "posisi kamu" (peringkat kelas & sekolah + nilai) + papan kelas & sekolah,
+  baris sendiri disorot. Kartu baru di dasbor `/guru` dan `/siswa`.
+
+### 🐛 Bug ditemukan saat e2e & diperbaiki
+- **Medali untuk nilai 0:** 8 siswa yang belum pernah berlatih seri di peringkat 2 → semuanya tampil
+  🥈. `medali()` kini menerima `nilai` dan mengembalikan "" bila ≤ 0 (+1 tes).
+
+### ✅ Verifikasi
+- `tsc --noEmit` bersih · `npm test` **103/103** (12 tes baru di `tests/peringkat.test.ts`) · `npm run build`
+  sukses, 2 rute baru terdaftar (`/guru/peringkat`, `/siswa/peringkat`).
+- Jalur data thd DB nyata (skrip tsx sementara, sudah dihapus): 9 siswa aktif → Budi #1 nilai 30.5
+  (skiba 10.3 dari 1 level & 20%, skibaca 50.7 dari 1 bacaan & 100%), kelas X TKJ 1 rata 6.1 (aktif 1/5).
+- **E2E live siswa**: login NISN 0012345678 → `/siswa/peringkat` render penuh, "Juara ke-1 di kelas",
+  1/5 kelas · 1/9 sekolah, baris sendiri disorot, **nol error konsol**.
+- **Halaman guru belum di-e2e visual** (butuh login staf berpassword — dilarang mengetik sandi; upaya
+  memakai sesi buatan diblokir). Yang terbukti: guard `307 → /masuk?tab=guru`, build, dan jalur data.
+- Catatan: `.claude/launch.json` di D:\test diperbaiki agar `next dev` berjalan dengan **cwd D:\AngkaSara**
+  (sebelumnya DATABASE_URL relatif gagal: "Cannot open database because the directory does not exist").
+
+---
+
 ## 2026-07-19 — "Jest worker … exceeding retry limit" di halaman raport = kehabisan RAM — TUNTAS
 
 ### ✅ Diagnosis (bukan bug kode)
