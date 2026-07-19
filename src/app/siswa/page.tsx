@@ -74,7 +74,7 @@ export default async function SiswaPage() {
           </div>
         </section>
 
-        {/* KARTU MODUL — Check Point diletakkan paling bawah */}
+        {/* KARTU MODUL — urutan: latihan → Check Point → Papan Peringkat (paling bawah) */}
         <div className="grid gap-4">
           <ModuleCard
             href="/siswa/skiba"
@@ -94,16 +94,6 @@ export default async function SiswaPage() {
             desc="5 jurusan × 5 level, kuis pemahaman + adu kecepatan baca (WPM)."
             gradient="from-amber-500 to-orange-600"
             cta={<CtaPill label="Membaca" />}
-          />
-
-          <ModuleCard
-            href="/siswa/peringkat"
-            emoji="🏆"
-            title="Papan Peringkat"
-            kepanjangan="Gabungan SKIBA Math + SKIBACA"
-            desc="Lihat posisimu di kelas dan di seluruh sekolah. Ayo naik peringkat!"
-            gradient="from-rose-500 to-pink-600"
-            cta={<CtaPill label="Lihat" />}
           />
 
           <ModuleCard
@@ -131,6 +121,16 @@ export default async function SiswaPage() {
                 <CtaPill label={cp?.status === "in_progress" ? "Lanjutkan" : "Mulai"} />
               )
             }
+          />
+
+          <ModuleCard
+            href="/siswa/peringkat"
+            emoji="🏆"
+            title="Papan Peringkat"
+            kepanjangan="Gabungan SKIBA Math + SKIBACA"
+            desc="Lihat posisimu di kelas dan di seluruh sekolah. Ayo naik peringkat!"
+            gradient="from-rose-500 to-pink-600"
+            cta={<CtaPill label="Lihat" />}
           />
         </div>
 
