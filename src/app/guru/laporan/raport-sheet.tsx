@@ -34,7 +34,22 @@ export default function RaportSheet({
   tahunAjaran: string;
 }) {
   return (
-    <article className="cetak-raport rounded-xl border border-black/10 bg-white p-8 text-zinc-900 shadow-sm">
+    <article className="cetak-raport relative isolate rounded-xl border border-black/10 bg-white p-8 text-zinc-900 shadow-sm">
+      {/*
+        Watermark lambang sekolah. `-z-10` + `isolate` di induk membuatnya tergambar DI ATAS latar
+        putih lembar tapi DI BAWAH seluruh teks, jadi tak mengganggu keterbacaan. `print-color-adjust`
+        agar tetap ikut tercetak saat browser mengabaikan warna latar.
+      */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={SEKOLAH.logo}
+          alt=""
+          className="w-3/5 max-w-[420px] object-contain opacity-[0.06]"
+          style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as React.CSSProperties}
+        />
+      </div>
+
       {/* Kop sekolah */}
       <header className="flex items-center gap-4 border-b-2 border-zinc-800 pb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
