@@ -5,6 +5,18 @@
 
 ---
 
+## HYD-01 — Hydration mismatch pada `<title>` di dalam SVG (grafik progres)
+- **Gejala:** badge merah **"1 Issue"** di pojok kiri-bawah `/guru/laporan/‹siswaId›`; terminal dev
+  mencetak `hydration-mismatch` menunjuk `progres-chart.tsx:53` pada elemen `<title>`.
+  Halaman tetap tampil — jadi mudah terlewat.
+- **Sebab:** `<title>` (juga `<textarea>`, `<option>`) diparse browser sebagai **teks mentah**.
+  Isinya ditulis sbg beberapa anak JSX (`{t.label} — {t.total} aktivitas` + 2 ekspresi kondisional);
+  React menyisipkan penanda pemisah antar-anak teks saat SSR, dan penanda itu hilang saat browser
+  memparse `<title>` → HTML server ≠ hasil hydration klien.
+- **Solusi:** rakit isinya jadi **satu string** di JS lalu render sebagai anak tunggal:
+  `const judul = ...; <title>{judul}</title>`.
+- **Status:** ✅ teratasi (terverifikasi live: badge Issue hilang, mode Harian/Mingguan/Bulanan render 200).
+
 ## MEM-01 — "Jest worker encountered N child process exceptions, exceeding retry limit"
 - **Gejala:** membuka halaman berat (mis. `/guru/laporan/‹siswaId›?semester=2026-1`) di `next dev`
   menampilkan overlay **Runtime Error: "Jest worker encountered 2 child process exceptions,

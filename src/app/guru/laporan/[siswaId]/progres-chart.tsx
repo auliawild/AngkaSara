@@ -41,6 +41,12 @@ export default function ProgresChart({ titik }: { titik: TitikProgres[] }) {
           const hLit = (t.jumlahLit / maxTotal) * ih;
           const x = cx(i) - bw / 2;
           const baseY = pad.t + ih;
+          // Satu string utuh: <title> diparse sbg teks mentah, jadi anak JSX ganda
+          // (teks + ekspresi) bikin hydration mismatch di klien.
+          const judul =
+            `${t.label} — ${t.total} aktivitas` +
+            (t.jumlahNum > 0 ? ` · Numerasi ${t.jumlahNum} (rata ${t.num})` : "") +
+            (t.jumlahLit > 0 ? ` · Literasi ${t.jumlahLit} (rata ${t.lit})` : "");
           return (
             <g key={t.key}>
               {t.jumlahNum > 0 && (
@@ -50,11 +56,7 @@ export default function ProgresChart({ titik }: { titik: TitikProgres[] }) {
                 <rect x={x} y={baseY - hNum - hLit} width={bw} height={hLit} fill={LIT} rx={2} />
               )}
               <rect x={cx(i) - slot / 2} y={pad.t} width={slot} height={ih} fill="transparent">
-                <title>
-                  {t.label} — {t.total} aktivitas
-                  {t.jumlahNum > 0 ? ` · Numerasi ${t.jumlahNum} (rata ${t.num})` : ""}
-                  {t.jumlahLit > 0 ? ` · Literasi ${t.jumlahLit} (rata ${t.lit})` : ""}
-                </title>
+                <title>{judul}</title>
               </rect>
               <text
                 x={cx(i)}
