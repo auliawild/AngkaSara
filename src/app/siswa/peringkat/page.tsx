@@ -12,6 +12,9 @@ export default async function PeringkatSiswaPage() {
   if (!sesi) redirect("/masuk?next=/siswa/peringkat");
 
   const d = await muatPeringkatSiswa();
+  // Siswa yang belum pernah berlatih seri di peringkat teratas bersama semua temannya yang juga 0
+  // → jangan disebut "juara". Ajak berlatih dulu.
+  const sudahBerlatih = (d.sayaSekolah?.nilai ?? 0) > 0;
 
   return (
     <div className="relative flex min-h-full flex-1 flex-col overflow-hidden">
@@ -31,19 +34,35 @@ export default async function PeringkatSiswaPage() {
           <div className="relative">
             <p className="text-sm font-medium text-white/80">Peringkat gabungan kamu</p>
             <h1 className="mt-0.5 text-3xl font-black tracking-tight">
-              {d.sayaKelas ? `Juara ke-${d.sayaKelas.peringkat} di kelas` : "Ayo mulai berlatih!"}
+              {sudahBerlatih ? `Juara ke-${d.sayaKelas!.peringkat} di kelas` : "Ayo mulai berlatih!"}
             </h1>
             <div className="mt-4 grid grid-cols-3 gap-2.5">
-              <Chip emoji="👥" nilai={d.sayaKelas ? `${d.sayaKelas.peringkat}/${d.totalKelas}` : "—"} label={d.kelasLabel || "kelas"} />
-              <Chip emoji="🏫" nilai={d.sayaSekolah ? `${d.sayaSekolah.peringkat}/${d.totalSiswa}` : "—"} label="sekolah" />
-              <Chip emoji="⭐" nilai={d.sayaSekolah ? `${d.sayaSekolah.nilai}` : "0"} label="nilai gabungan" />
+              <Chip
+                emoji="👥"
+                nilai={sudahBerlatih ? `${d.sayaKelas!.peringkat}/${d.totalKelas}` : "—"}
+                label={d.kelasLabel || "kelas"}
+              />
+              <Chip
+                emoji="🏫"
+                nilai={sudahBerlatih ? `${d.sayaSekolah!.peringkat}/${d.totalSiswa}` : "—"}
+                label="sekolah"
+              />
+              <Chip emoji="⭐" nilai={`${d.sayaSekolah?.nilai ?? 0}`} label="nilai gabungan" />
             </div>
-            {d.sayaSekolah && (
-              <p className="mt-3 text-xs font-medium text-white/80">
-                🧮 SKIBA {d.sayaSekolah.nilaiSkiba} · 📖 SKIBACA {d.sayaSekolah.nilaiSkibaca} — nilai gabungan
-                dihitung dari seberapa banyak yang kamu selesaikan <b>dan</b> seberapa tepat jawabanmu.
-              </p>
-            )}
+            <p className="mt-3 text-xs font-medium text-white/80">
+              {sudahBerlatih ? (
+                <>
+                  🧮 SKIBA {d.sayaSekolah!.nilaiSkiba} · 📖 SKIBACA {d.sayaSekolah!.nilaiSkibaca} — nilai
+                  gabungan dihitung dari seberapa banyak yang kamu selesaikan <b>dan</b> seberapa tepat
+                  jawabanmu.
+                </>
+              ) : (
+                <>
+                  Kerjakan arena SKIBA Math atau bacaan SKIBACA dulu, ya — begitu ada yang kamu selesaikan,
+                  peringkatmu langsung muncul di sini. 💪
+                </>
+              )}
+            </p>
           </div>
         </section>
 
@@ -111,8 +130,14 @@ function Papan({
                   aku ? "bg-violet-500/15 font-bold" : ""
                 }`}
               >
-                <span className="w-10 shrink-0 text-center font-black tabular-nums">
-                  {medali(r.peringkat, r.nilai) || r.peringkat}
+                {/* Yang belum berlatih (nilai 0) seri di peringkat teratas — tampilkan "–" saja
+                    supaya tak terbaca seperti juara. */}
+                <span
+                  className={`w-10 shrink-0 text-center font-black tabular-nums ${
+                    r.nilai > 0 ? "" : "text-zinc-400"
+                  }`}
+                >
+                  {r.nilai > 0 ? medali(r.peringkat, r.nilai) || r.peringkat : "–"}
                 </span>
                 <span className="min-w-0 flex-1 truncate">
                   {r.nama}

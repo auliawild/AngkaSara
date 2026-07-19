@@ -61,7 +61,30 @@ export default async function PeringkatPage({
               Rata-rata memakai <b>seluruh</b> siswa kelas (yang belum pernah berlatih dihitung 0).
             </p>
           </div>
-          <div className="overflow-x-auto">
+          {/* HP: kartu per kelas (tabel 6 kolom tak terbaca di layar sempit) */}
+          <ul className="divide-y divide-black/5 sm:hidden dark:divide-white/5">
+            {d.kelas.map((k) => (
+              <li key={k.kelasLabel} className="flex items-center gap-3 px-4 py-3">
+                <span className="w-9 shrink-0 text-center font-black tabular-nums">
+                  {medali(k.peringkat, k.rataNilai) || k.peringkat}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/guru/peringkat?lingkup=kelas&kelas=${encodeURIComponent(k.kelasLabel)}`}
+                    className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {ikonJurusan(k.kelasLabel)} {k.kelasLabel}
+                  </Link>
+                  <div className="mt-0.5 text-xs text-zinc-500">
+                    🧮 {k.rataSkiba} · 📖 {k.rataSkibaca} · aktif {k.jumlahAktif}/{k.jumlahSiswa}
+                  </div>
+                </div>
+                <span className="shrink-0 text-lg font-bold tabular-nums">{k.rataNilai}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-zinc-500">
                 <tr className="border-b border-black/10 dark:border-white/10">

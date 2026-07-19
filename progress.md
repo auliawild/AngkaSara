@@ -43,6 +43,17 @@ nilai        = (nilaiSkiba + nilaiSkibaca) / 2        → 0..100, dibulatkan 1 d
 ### 🐛 Bug ditemukan saat e2e & diperbaiki
 - **Medali untuk nilai 0:** 8 siswa yang belum pernah berlatih seri di peringkat 2 → semuanya tampil
   🥈. `medali()` kini menerima `nilai` dan mengembalikan "" bila ≤ 0 (+1 tes).
+- **"Juara ke-1" untuk siswa bernilai 0** (ketahuan saat cek tampilan HP): bila seluruh teman sekelas
+  juga 0, semuanya seri di peringkat 1 dan hero menyapa "Juara ke-1 di kelas". Kini hero memakai
+  `sudahBerlatih` (nilai > 0) → "Ayo mulai berlatih!" + ajakan, chip peringkat "—", dan baris papan
+  bernilai 0 menampilkan "–" abu-abu, bukan angka peringkat.
+- **Tabel guru tak terbaca di HP:** tabel 7 kolom terpotong. `tabel.tsx` & tabel antar-kelas kini
+  `sm:hidden` → kartu per siswa/kelas di layar sempit, tabel penuh di `sm` ke atas.
+
+### ⚠️ Temuan keamanan (di luar fitur ini)
+- Log dev Next 16 mencetak **argumen server action apa adanya**, termasuk kata sandi:
+  `masukStaf("admin@…", "‹sandi›")`. Sandi admin dev sudah bocor ke log terminal sesi ini →
+  **ganti sandi admin**, dan pastikan logging ini mati di produksi.
 
 ### ✅ Verifikasi
 - `tsc --noEmit` bersih · `npm test` **103/103** (12 tes baru di `tests/peringkat.test.ts`) · `npm run build`
