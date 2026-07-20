@@ -95,3 +95,103 @@ export function agregatProgres(
     rataLit: cntLitAll ? Math.round(sumLitAll / cntLitAll) : null,
   };
 }
+
+/* ══════════ Kalender latihan HARIAN dalam satu bulan ══════════
+ * Menampilkan tiap tanggal: mengerjakan atau tidak & berapa banyak (numerasi/literasi).
+ */
+export interface HariKalender {
+  tanggal: number; // 1..jumlahHari
+  iso: string; // "YYYY-MM-DD"
+  dow: number; // 0..6 (0 = Minggu), utk tata letak kalender
+  num: number; // jumlah pengerjaan numerasi hari itu
+  lit: number; // jumlah pengerjaan literasi hari itu
+  total: number; // num + lit
+  ada: boolean; // total > 0 (mengerjakan hari itu)
+}
+
+export interface KalenderData {
+  tahun: number;
+  bulan: number; // 1..12
+  jumlahHari: number;
+  dowAwal: number; // hari-dalam-minggu tanggal 1 (0 = Minggu) — untuk sel kosong di awal grid
+  hari: HariKalender[]; // urut tanggal 1..jumlahHari
+  hariAktif: number; // banyak hari mengerjakan
+  totalNum: number;
+  totalLit: number;
+  total: number;
+  maxHarian: number; // pengerjaan terbanyak dalam satu hari (skala warna)
+  streakTerpanjang: number; // rentetan hari aktif berturut terpanjang
+  rataNum: number | null; // mutu: rata skor numerasi sebulan
+  rataLit: number | null;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Agregasi aktivitas menjadi kalender harian untuk bulan (tahun, bulan 1..12). */
+export function agregatKalender(aktivitas: AktivitasRingkas[], tahun: number, bulan: number): KalenderData {
+  const jumlahHari = new Date(tahun, bulan, 0).getDate(); // bulan 1-based → 0 hari bulan berikut = hari terakhir
+  const num = new Array<number>(jumlahHari + 1).fill(0);
+  const lit = new Array<number>(jumlahHari + 1).fill(0);
+  let sumNum = 0;
+  let cntNum = 0;
+  let sumLit = 0;
+  let cntLit = 0;
+
+  for (const a of aktivitas) {
+    const d = new Date(a.ts);
+    if (d.getFullYear() !== tahun || d.getMonth() + 1 !== bulan) continue;
+    const t = d.getDate();
+    if (a.domain === "NUMERASI") {
+      num[t]++;
+      sumNum += a.score;
+      cntNum++;
+    } else if (a.domain === "LITERASI") {
+      lit[t]++;
+      sumLit += a.score;
+      cntLit++;
+    }
+  }
+
+  const hari: HariKalender[] = [];
+  let hariAktif = 0;
+  let maxHarian = 0;
+  let streak = 0;
+  let streakMax = 0;
+  for (let t = 1; t <= jumlahHari; t++) {
+    const total = num[t] + lit[t];
+    const ada = total > 0;
+    if (ada) {
+      hariAktif++;
+      if (total > maxHarian) maxHarian = total;
+      streak++;
+      if (streak > streakMax) streakMax = streak;
+    } else {
+      streak = 0;
+    }
+    hari.push({
+      tanggal: t,
+      iso: `${tahun}-${pad2(bulan)}-${pad2(t)}`,
+      dow: new Date(tahun, bulan - 1, t).getDay(),
+      num: num[t],
+      lit: lit[t],
+      total,
+      ada,
+    });
+  }
+
+  return {
+    tahun,
+    bulan,
+    jumlahHari,
+    dowAwal: new Date(tahun, bulan - 1, 1).getDay(),
+    hari,
+    hariAktif,
+    totalNum: cntNum,
+    totalLit: cntLit,
+    total: cntNum + cntLit,
+    maxHarian,
+    streakTerpanjang: streakMax,
+    rataNum: cntNum ? Math.round(sumNum / cntNum) : null,
+    rataLit: cntLit ? Math.round(sumLit / cntLit) : null,
+  };
+}

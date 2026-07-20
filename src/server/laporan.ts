@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { urutkanKelas } from "@/lib/kelas";
+import { urutkanKelas, BULAN_PANJANG } from "@/lib/kelas";
 import {
   agregatDiagLiterasi,
   agregatDiagNumerasi,
@@ -24,7 +24,7 @@ import {
   tahunAjaran,
   type Semester,
 } from "@/lib/semester";
-import { agregatProgres, type ProgresData } from "@/lib/progres";
+import { agregatProgres, agregatKalender, type ProgresData, type KalenderData } from "@/lib/progres";
 import type { BucketMode } from "@/lib/kelas";
 
 async function requireStaf(): Promise<void> {
@@ -352,37 +352,6 @@ export const KET_MODE: Record<BucketMode, string> = {
   tahun: "5 tahun terakhir",
 };
 
-export interface ProgresCetakSiswa {
-  nama: string;
-  nisn: string;
-  kelasLabel: string;
-  mode: BucketMode;
-  prog: ProgresData;
-}
-
-/** Progres latihan satu siswa + identitas (untuk lembar cetak perorangan). Null bila siswa tak ada. */
-export async function muatProgresCetakSiswa(params: { siswaId: string; mode?: string }): Promise<ProgresCetakSiswa | null> {
-  await requireStaf();
-  const st = await prisma.student.findUnique({
-    where: { id: params.siswaId },
-    select: { id: true, nama: true, nisn: true, kelas: { select: { label: true } } },
-  });
-  if (!st) return null;
-
-  const mode = pilihMode(params.mode);
-  const sejak = new Date();
-  sejak.setDate(sejak.getDate() - 400);
-  const akt = await prisma.practiceActivity.findMany({
-    where: { studentId: st.id, createdAt: { gte: sejak } },
-    select: { createdAt: true, domain: true, score: true, points: true },
-  });
-  const prog = agregatProgres(
-    akt.map((a) => ({ ts: a.createdAt, domain: a.domain, score: a.score, points: a.points ?? 0 })),
-    mode,
-  );
-  return { nama: st.nama, nisn: st.nisn, kelasLabel: st.kelas.label, mode, prog };
-}
-
 export interface BarisProgresKelas {
   siswaId: string;
   nama: string;
@@ -447,4 +416,68 @@ export async function muatProgresKelas(params: { kelas: string; mode?: string })
   });
 
   return { kelas: params.kelas, mode, baris };
+}
+
+/* ── Kalender latihan harian (satu bulan) ── */
+
+/** Parse "YYYY-MM" → {tahun, bulan 1..12}. Default: bulan berjalan. */
+function parseBulan(s?: string): { tahun: number; bulan: number } {
+  const m = /^(\d{4})-(\d{2})$/.exec(s ?? "");
+  if (m) {
+    const th = Number(m[1]);
+    const bl = Number(m[2]);
+    if (bl >= 1 && bl <= 12) return { tahun: th, bulan: bl };
+  }
+  const now = new Date();
+  return { tahun: now.getFullYear(), bulan: now.getMonth() + 1 };
+}
+const idBulan = (th: number, bl: number) => `${th}-${String(bl).padStart(2, "0")}`;
+
+export interface KalenderSiswa {
+  nama: string;
+  nisn: string;
+  kelasLabel: string;
+  bulanId: string; // "YYYY-MM"
+  bulanLabel: string; // "Juli 2026"
+  prev: string; // "YYYY-MM"
+  next: string;
+  kal: KalenderData;
+}
+
+/** Kalender latihan harian satu siswa untuk satu bulan (layar & cetak). Null bila siswa tak ada. */
+export async function muatKalenderSiswa(params: { siswaId: string; bulan?: string }): Promise<KalenderSiswa | null> {
+  await requireStaf();
+  const st = await prisma.student.findUnique({
+    where: { id: params.siswaId },
+    select: { id: true, nama: true, nisn: true, kelas: { select: { label: true } } },
+  });
+  if (!st) return null;
+
+  const { tahun, bulan } = parseBulan(params.bulan);
+  const mulai = new Date(tahun, bulan - 1, 1);
+  const selesai = new Date(tahun, bulan, 1); // awal bulan berikutnya (eksklusif)
+
+  const akt = await prisma.practiceActivity.findMany({
+    where: { studentId: st.id, createdAt: { gte: mulai, lt: selesai } },
+    select: { createdAt: true, domain: true, score: true, points: true },
+  });
+  const kal = agregatKalender(
+    akt.map((a) => ({ ts: a.createdAt, domain: a.domain, score: a.score, points: a.points ?? 0 })),
+    tahun,
+    bulan,
+  );
+
+  const prevB = bulan === 1 ? { th: tahun - 1, bl: 12 } : { th: tahun, bl: bulan - 1 };
+  const nextB = bulan === 12 ? { th: tahun + 1, bl: 1 } : { th: tahun, bl: bulan + 1 };
+
+  return {
+    nama: st.nama,
+    nisn: st.nisn,
+    kelasLabel: st.kelas.label,
+    bulanId: idBulan(tahun, bulan),
+    bulanLabel: `${BULAN_PANJANG[bulan - 1]} ${tahun}`,
+    prev: idBulan(prevB.th, prevB.bl),
+    next: idBulan(nextB.th, nextB.bl),
+    kal,
+  };
 }

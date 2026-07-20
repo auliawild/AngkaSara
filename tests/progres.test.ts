@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agregatProgres, type AktivitasRingkas } from "@/lib/progres";
+import { agregatProgres, agregatKalender, type AktivitasRingkas } from "@/lib/progres";
 
 const NOW = new Date(2026, 6, 18); // 18 Juli 2026 (Sabtu)
 const A = (d: Date, domain: string, score: number, points = 0): AktivitasRingkas => ({ ts: d, domain, score, points });
@@ -56,5 +56,39 @@ describe("agregatProgres — kosong", () => {
     expect(d.titik).toHaveLength(12);
     expect(d).toMatchObject({ totalAktivitas: 0, totalPoin: 0, bucketAktif: 0, rataNum: null, rataLit: null });
     expect(d.titik.every((t) => t.total === 0 && t.num === null)).toBe(true);
+  });
+});
+
+describe("agregatKalender — kalender harian sebulan", () => {
+  it("per tanggal: mengerjakan/tidak + jumlah, hari aktif, streak, rata; bulan lain diabaikan", () => {
+    const kal = agregatKalender(
+      [
+        A(new Date(2026, 6, 1), "NUMERASI", 80),
+        A(new Date(2026, 6, 1), "LITERASI", 60), // tgl 1: 2 pengerjaan
+        A(new Date(2026, 6, 2), "NUMERASI", 100), // tgl 2: 1
+        A(new Date(2026, 6, 5), "LITERASI", 40), // tgl 5: 1
+        A(new Date(2026, 5, 10), "NUMERASI", 50), // Juni → diabaikan
+      ],
+      2026,
+      7,
+    );
+    expect(kal.jumlahHari).toBe(31);
+    expect(kal.hari[0]).toMatchObject({ tanggal: 1, num: 1, lit: 1, total: 2, ada: true });
+    expect(kal.hari[1]).toMatchObject({ tanggal: 2, num: 1, lit: 0, total: 1, ada: true });
+    expect(kal.hari[2]).toMatchObject({ tanggal: 3, total: 0, ada: false });
+    expect(kal.hariAktif).toBe(3);
+    expect(kal.totalNum).toBe(2);
+    expect(kal.totalLit).toBe(2);
+    expect(kal.maxHarian).toBe(2);
+    expect(kal.streakTerpanjang).toBe(2); // tgl 1 & 2 berturut
+    expect(kal.rataNum).toBe(90); // (80+100)/2
+    expect(kal.rataLit).toBe(50); // (60+40)/2
+    expect(kal.dowAwal).toBe(new Date(2026, 6, 1).getDay());
+  });
+  it("bulan tanpa aktivitas → hariAktif 0, semua hari tak ada", () => {
+    const kal = agregatKalender([], 2026, 2);
+    expect(kal.jumlahHari).toBe(28); // Feb 2026 (bukan kabisat)
+    expect(kal.hariAktif).toBe(0);
+    expect(kal.hari.every((h) => !h.ada)).toBe(true);
   });
 });

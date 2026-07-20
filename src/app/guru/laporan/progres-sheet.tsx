@@ -1,13 +1,13 @@
 /**
- * Satu lembar "Progres Latihan" siap cetak (A4, server component). Menampilkan jumlah pengerjaan
- * numerasi & literasi terpisah (kuantitas) beserta mutu capaian (rata nilai), grafik per periode,
- * dan rincian tiap periode. Dipakai cetak perorangan (guru & admin).
+ * Satu lembar "Laporan Progres Latihan" siap cetak (A4, server component). Fokus pada KALENDER
+ * LATIHAN HARIAN satu bulan: tiap tanggal mengerjakan atau tidak & berapa banyak (numerasi/literasi),
+ * dilengkapi ringkasan bulan + rincian hari aktif. Dipakai cetak perorangan (guru & admin).
  */
-import { ikonJurusan } from "@/lib/kelas";
-import type { ProgresData } from "@/lib/progres";
+import { HARI_PENDEK, ikonJurusan } from "@/lib/kelas";
+import type { KalenderData } from "@/lib/progres";
 import { SEKOLAH } from "@/lib/sekolah";
+import KalenderHarian from "./kalender-harian";
 import KopSekolah from "./kop-sekolah";
-import ProgresChart from "./[siswaId]/progres-chart";
 
 const NUM = "#2563eb";
 const LIT = "#c9723f";
@@ -16,18 +16,17 @@ export default function ProgresSheet({
   nama,
   nisn,
   kelasLabel,
-  prog,
-  modeLabel,
-  ket,
+  bulanLabel,
+  kal,
 }: {
   nama: string;
   nisn: string;
   kelasLabel: string;
-  prog: ProgresData;
-  modeLabel: string; // "Harian" | "Mingguan" | "Bulanan"
-  ket: string; // "14 hari terakhir" dst.
+  bulanLabel: string;
+  kal: KalenderData;
 }) {
   const tglCetak = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const hariAktif = kal.hari.filter((h) => h.ada);
 
   return (
     <article className="cetak-lembar relative isolate rounded-xl border border-black/10 text-zinc-900 shadow-sm">
@@ -36,99 +35,70 @@ export default function ProgresSheet({
       <h2 className="mt-5 text-center text-base font-bold uppercase leading-snug tracking-wider">
         Laporan Progres Latihan
         <br />
-        Literasi &amp; Numerasi
+        Kalender Latihan Harian
       </h2>
-      <p className="mt-1 text-center text-sm text-zinc-600">
-        Rekap {modeLabel} · {ket}
-      </p>
+      <p className="mt-1 text-center text-sm text-zinc-600">{bulanLabel}</p>
 
       {/* Identitas */}
       <section className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
         <Baris k="Nama" v={nama} />
         <Baris k="Kelas" v={`${ikonJurusan(kelasLabel)} ${kelasLabel}`} />
         <Baris k="NISN" v={nisn} />
-        <Baris k="Rekap" v={modeLabel} />
+        <Baris k="Bulan" v={bulanLabel} />
       </section>
 
-      {/* A. Ringkasan kuantitas & mutu */}
+      {/* A. Ringkasan bulan */}
       <section className="mt-5">
-        <h3 className="text-sm font-bold">A. Ringkasan</h3>
-        <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg border border-zinc-300 p-3">
-            <div className="font-semibold" style={{ color: NUM }}>
-              🧮 Numerasi (SKIBA)
-            </div>
-            <ul className="mt-1 space-y-0.5 text-zinc-700">
-              <li>
-                Jumlah pengerjaan: <b>{prog.totalNum}</b>
-              </li>
-              <li>
-                Mutu (rata nilai): <b>{prog.rataNum ?? "—"}</b>
-              </li>
-            </ul>
-          </div>
-          <div className="rounded-lg border border-zinc-300 p-3">
-            <div className="font-semibold" style={{ color: LIT }}>
-              📖 Literasi (SKIBACA)
-            </div>
-            <ul className="mt-1 space-y-0.5 text-zinc-700">
-              <li>
-                Jumlah pengerjaan: <b>{prog.totalLit}</b>
-              </li>
-              <li>
-                Mutu (rata nilai): <b>{prog.rataLit ?? "—"}</b>
-              </li>
-            </ul>
-          </div>
+        <h3 className="text-sm font-bold">A. Ringkasan Bulan</h3>
+        <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+          <Kotak label={`Hari aktif (dari ${kal.jumlahHari})`} nilai={kal.hariAktif} />
+          <Kotak label="Total pengerjaan" nilai={kal.total} />
+          <Kotak label="Numerasi (rata nilai)" nilai={`${kal.totalNum} (${kal.rataNum ?? "—"})`} warna={NUM} />
+          <Kotak label="Literasi (rata nilai)" nilai={`${kal.totalLit} (${kal.rataLit ?? "—"})`} warna={LIT} />
         </div>
         <p className="mt-2 text-xs text-zinc-500">
-          Total pengerjaan: <b>{prog.totalAktivitas}</b> · Total poin: <b>{prog.totalPoin}</b> · Aktif di{" "}
-          {prog.bucketAktif} dari {prog.titik.length} periode.
+          Rentetan hari aktif terpanjang: <b>{kal.streakTerpanjang}</b> hari.
         </p>
       </section>
 
-      {/* B. Grafik jumlah pengerjaan per periode */}
+      {/* B. Kalender */}
       <section className="mt-5">
-        <h3 className="text-sm font-bold">B. Jumlah Pengerjaan per Periode</h3>
-        <div className="mt-2 rounded-lg border border-zinc-300 p-2">
-          <ProgresChart titik={prog.titik} />
+        <h3 className="text-sm font-bold">B. Kalender Latihan Harian</h3>
+        <div className="mt-2">
+          <KalenderHarian kal={kal} />
         </div>
       </section>
 
-      {/* C. Rincian per periode */}
+      {/* C. Rincian hari aktif */}
       <section className="mt-5">
-        <h3 className="text-sm font-bold">C. Rincian per Periode</h3>
+        <h3 className="text-sm font-bold">C. Rincian Hari Mengerjakan</h3>
         <table className="mt-2 w-full border-collapse text-sm">
           <thead>
             <tr className="bg-zinc-100 text-left">
-              <Th>Periode</Th>
+              <Th>Tanggal</Th>
               <Th center>Numerasi</Th>
-              <Th center>Rata Nilai</Th>
               <Th center>Literasi</Th>
-              <Th center>Rata Nilai</Th>
-              <Th center>Poin</Th>
+              <Th center>Total</Th>
             </tr>
           </thead>
           <tbody>
-            {prog.titik.filter((t) => t.total > 0).length === 0 ? (
+            {hariAktif.length === 0 ? (
               <tr>
-                <td colSpan={6} className="border border-zinc-300 px-3 py-2 text-center text-zinc-500">
-                  Belum ada pengerjaan pada rentang ini.
+                <td colSpan={4} className="border border-zinc-300 px-3 py-2 text-center text-zinc-500">
+                  Tidak ada hari mengerjakan pada bulan ini.
                 </td>
               </tr>
             ) : (
-              prog.titik
-                .filter((t) => t.total > 0)
-                .map((t) => (
-                  <tr key={t.key}>
-                    <Td>{t.label}</Td>
-                    <Td center>{t.jumlahNum}</Td>
-                    <Td center>{t.num ?? "—"}</Td>
-                    <Td center>{t.jumlahLit}</Td>
-                    <Td center>{t.lit ?? "—"}</Td>
-                    <Td center>{t.poin}</Td>
-                  </tr>
-                ))
+              hariAktif.map((h) => (
+                <tr key={h.tanggal}>
+                  <Td>
+                    {HARI_PENDEK[h.dow]}, {h.tanggal} {bulanLabel}
+                  </Td>
+                  <Td center>{h.num}</Td>
+                  <Td center>{h.lit}</Td>
+                  <Td center>{h.total}</Td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -155,6 +125,16 @@ function Baris({ k, v }: { k: string; v: string }) {
       <span className="w-24 shrink-0 text-zinc-500">{k}</span>
       <span className="text-zinc-500">:</span>
       <span className="font-medium">{v}</span>
+    </div>
+  );
+}
+function Kotak({ label, nilai, warna }: { label: string; nilai: number | string; warna?: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-300 p-3">
+      <div className="text-xl font-bold" style={warna ? { color: warna } : undefined}>
+        {nilai}
+      </div>
+      <div className="mt-0.5 text-xs text-zinc-500">{label}</div>
     </div>
   );
 }

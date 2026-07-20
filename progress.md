@@ -10,6 +10,35 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-20 — Progres Latihan: Kalender Latihan Harian (per bulan) — TUNTAS
+
+### ✅ Permintaan user
+- Tampilkan **perkembangan harian yang dirangkum sebulan**: tiap hari **mengerjakan atau tidak** & **berapa banyak**.
+
+### ✅ Implementasi
+- `lib/progres.ts` **`agregatKalender(aktivitas, tahun, bulan)`** → `KalenderData`: per-tanggal
+  `{num, lit, total, ada, dow, iso}` + `hariAktif`, `totalNum/Lit`, `maxHarian`, `streakTerpanjang`,
+  `rataNum/Lit` (mutu). `dowAwal` utk tata letak grid. (+2 tes → **111/111**).
+- `server/laporan.ts` **`muatKalenderSiswa({siswaId, bulan})`** (bulan "YYYY-MM", default bulan berjalan;
+  `parseBulan`, prev/next, label bulan). Loader lama trend `muatProgresCetakSiswa` **dihapus** (tak dipakai lagi).
+- Komponen **`kalender-harian.tsx`**: grid 7 kolom, header hari (Min–Sab), sel tanggal berwarna
+  (heatmap hijau by jumlah; abu-abu = tidak mengerjakan, tampil titik "·"), tooltip num/lit, legenda.
+  Kartu **selalu terang** (konsisten layar terang/gelap & cetak; `print-color-adjust:exact`).
+- Halaman detail `[siswaId]`: blok **📅 Kalender Latihan Harian** (utama) + navigasi bulan (‹/›) +
+  stat bulan (hari aktif X/N, total pengerjaan, numerasi/literasi jml+rata) + tombol Cetak Progres.
+  Grafik lama jadi blok **📈 Tren Latihan** sekunder (mode **mingguan/bulanan** saja — "harian" dibuang,
+  digantikan kalender).
+- **Cetak perorangan** `/guru/laporan/cetak-progres?siswaId=&bulan=`: `progres-sheet.tsx` ditulis ulang jadi
+  **laporan kalender** (kop + ringkasan bulan + kalender + **tabel rincian hari mengerjakan** + ttd), A4 + watermark,
+  navigasi bulan. Cetak rekap sekelas TIDAK berubah.
+
+### ✅ Verifikasi
+- `tsc` bersih, **test 111/111**, `npm run build` sukses (23 rute). Data path DB nyata: Budi Juli 2026 →
+  hariAktif 2 (tgl 17 num1, tgl 18 lit1), streak 2, `dowAwal=3` (1 Juli 2026 = Rabu) benar.
+- **Visual cetak saat login staf BELUM di-e2e** (larangan password) — user cek Print Preview + "Background graphics".
+
+---
+
 ## 2026-07-20 — Raport A4 + watermark tiap halaman + cetak Progres Latihan (perorangan & sekelas) — TUNTAS
 
 ### ✅ Keputusan user

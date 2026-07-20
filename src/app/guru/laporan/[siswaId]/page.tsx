@@ -2,17 +2,18 @@ import { headers } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { muatRaportSiswa, muatProgresSiswa } from "@/server/laporan";
+import { muatRaportSiswa, muatProgresSiswa, muatKalenderSiswa } from "@/server/laporan";
 import CetakTombol from "../cetak-tombol";
 import CetakWatermark from "../cetak-watermark";
+import KalenderHarian from "../kalender-harian";
 import ProgresChart from "./progres-chart";
 import RaportSheet from "../raport-sheet";
 import { TandaTanganProvider, PanelTandaTangan } from "../tanda-tangan";
 
 export const metadata = { title: "Raport Siswa — AngkaSara" };
 
+// Tren jangka panjang (kalender menangani rincian harian).
 const MODES = [
-  { id: "hari", label: "Harian", ket: "14 hari terakhir" },
   { id: "minggu", label: "Mingguan", ket: "12 minggu terakhir" },
   { id: "bulan", label: "Bulanan", ket: "12 bulan terakhir" },
 ] as const;
@@ -22,7 +23,7 @@ export default async function RaportPage({
   searchParams,
 }: {
   params: Promise<{ siswaId: string }>;
-  searchParams: Promise<{ semester?: string; mode?: string }>;
+  searchParams: Promise<{ semester?: string; mode?: string; bulan?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   const { siswaId } = await params;
@@ -34,7 +35,11 @@ export default async function RaportPage({
   if (!d) notFound();
   const { raport: r, semesterLabel } = d;
   const prog = await muatProgresSiswa({ siswaId, mode: sp.mode });
+  const kal = await muatKalenderSiswa({ siswaId, bulan: sp.bulan });
   const modeKet = MODES.find((m) => m.id === prog?.mode)?.ket ?? "";
+
+  const baseUrl = `/guru/laporan/${siswaId}?semester=${d.semesterId}`;
+  const modeAktif = prog?.mode ?? "minggu";
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-6 py-8">
@@ -52,39 +57,78 @@ export default async function RaportPage({
         {isAdmin && <CetakTombol />}
       </div>
 
-      {/* ===== Progres Latihan harian/mingguan/bulanan (layar; cetak via halaman khusus) ===== */}
+      {/* ===== Kalender Latihan Harian (satu bulan) — layar; cetak via halaman khusus ===== */}
+      {kal && (
+        <section className="no-print rounded-xl border border-black/10 p-5 dark:border-white/15">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">📅 Kalender Latihan Harian</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                {r.nama} · setiap hari mengerjakan atau tidak &amp; berapa banyak
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Link
+                href={`${baseUrl}&mode=${modeAktif}&bulan=${kal.prev}`}
+                className="rounded-lg border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+              >
+                ‹ Bln lalu
+              </Link>
+              <span className="min-w-[110px] text-center font-medium">{kal.bulanLabel}</span>
+              <Link
+                href={`${baseUrl}&mode=${modeAktif}&bulan=${kal.next}`}
+                className="rounded-lg border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+              >
+                Bln depan ›
+              </Link>
+              <Link
+                href={`/guru/laporan/cetak-progres?siswaId=${siswaId}&bulan=${kal.bulanId}`}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 font-medium text-white hover:bg-blue-700"
+              >
+                🖨️ Cetak Progres
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label={`Hari aktif (dari ${kal.kal.jumlahHari})`} nilai={kal.kal.hariAktif} warna="#16a34a" />
+            <StatTile label="Total pengerjaan" nilai={kal.kal.total} />
+            <StatTile label="Numerasi (rata nilai)" nilai={`${kal.kal.totalNum} (${kal.kal.rataNum ?? "—"})`} warna="#2563eb" />
+            <StatTile label="Literasi (rata nilai)" nilai={`${kal.kal.totalLit} (${kal.kal.rataLit ?? "—"})`} warna="#c9723f" />
+          </div>
+
+          <div className="mt-4">
+            <KalenderHarian kal={kal.kal} />
+          </div>
+          <p className="mt-2 text-xs text-zinc-400">
+            Rentetan hari aktif terpanjang bulan ini: {kal.kal.streakTerpanjang} hari.
+          </p>
+        </section>
+      )}
+
+      {/* ===== Tren jangka panjang (mingguan/bulanan) ===== */}
       {prog && (
         <section className="no-print rounded-xl border border-black/10 p-5 dark:border-white/15">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold">📈 Progres Latihan {r.nama}</h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                Jumlah pengerjaan &amp; mutu capaian SKIBA/SKIBACA · {modeKet}
-              </p>
+              <h2 className="font-semibold">📈 Tren Latihan</h2>
+              <p className="mt-1 text-sm text-zinc-500">Jumlah pengerjaan &amp; mutu capaian · {modeKet}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1 rounded-lg bg-black/5 p-1 text-sm dark:bg-white/10">
-                {MODES.map((m) => (
-                  <Link
-                    key={m.id}
-                    href={`/guru/laporan/${siswaId}?semester=${d.semesterId}&mode=${m.id}`}
-                    className={
-                      "rounded-md px-3 py-1 transition-colors " +
-                      (prog.mode === m.id
-                        ? "bg-white font-medium shadow-sm dark:bg-zinc-700"
-                        : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200")
-                    }
-                  >
-                    {m.label}
-                  </Link>
-                ))}
-              </div>
-              <Link
-                href={`/guru/laporan/cetak-progres?siswaId=${siswaId}&mode=${prog.mode}`}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                🖨️ Cetak Progres
-              </Link>
+            <div className="flex gap-1 rounded-lg bg-black/5 p-1 text-sm dark:bg-white/10">
+              {MODES.map((m) => (
+                <Link
+                  key={m.id}
+                  href={`${baseUrl}&mode=${m.id}${kal ? `&bulan=${kal.bulanId}` : ""}`}
+                  className={
+                    "rounded-md px-3 py-1 transition-colors " +
+                    (prog.mode === m.id
+                      ? "bg-white font-medium shadow-sm dark:bg-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200")
+                  }
+                >
+                  {m.label}
+                </Link>
+              ))}
             </div>
           </div>
 
