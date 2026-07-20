@@ -8,14 +8,9 @@
  *
  * Impor pakai path relatif (bukan alias @/) supaya tsx tak perlu resolusi paths.
  */
-import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { JURUSAN_LIST, TINGKAT, rombelUntuk, namaKelas } from "../src/lib/kelas";
 import { BACAAN_CHECKPOINT } from "./data/bacaan-checkpoint";
-
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL as string });
-const prisma = new PrismaClient({ adapter });
+import { prisma } from "./seed-client";
 
 async function main() {
   // 1) Jurusan (5) — urutan ikut posisi di JURUSAN_LIST.

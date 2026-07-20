@@ -2,9 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone", // untuk image Docker ramping (lihat Dockerfile)
-  // exceljs (impor/template siswa) adalah lib Node besar — jangan di-bundle,
-  // biarkan di-require saat runtime server (route handler & server action).
-  serverExternalPackages: ["exceljs"],
+  // Paket Node yang tak boleh di-bundle — di-require saat runtime server & disalin
+  // apa adanya ke output `standalone` (penting untuk modul native): exceljs (impor
+  // Excel) serta driver DB Prisma (pg/better-sqlite3 + adapternya).
+  serverExternalPackages: [
+    "exceljs",
+    "@prisma/adapter-pg",
+    "pg",
+    "@prisma/adapter-better-sqlite3",
+    "better-sqlite3",
+  ],
 
   // === Hemat memori (laptop dev hanya ~4 GB RAM) ===
   // Gejala bila memori habis: worker render Next mati dan browser menampilkan

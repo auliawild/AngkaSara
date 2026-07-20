@@ -11,13 +11,8 @@
  * sehingga jawaban benar tak selalu di posisi A namun tetap reproducible.
  * Sumber JSON: opsi[0] hasil ekstraksi = { q, benar, salah[3] }.
  */
-import "dotenv/config";
 import { readFileSync } from "node:fs";
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL as string });
-const prisma = new PrismaClient({ adapter });
+import { prisma } from "./seed-client";
 
 interface RawSoal {
   q: string;

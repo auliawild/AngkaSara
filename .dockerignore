@@ -10,3 +10,12 @@ Dockerfile
 docker-compose.yml
 *.md
 plans
+# DB dev SQLite & sidecar — jangan ikut ke image (produksi pakai Postgres)
+prisma/data/*.db
+prisma/data/*.db-journal
+prisma/data/*.db-wal
+prisma/data/*.db-shm
+# berkas kerja & contoh yang tak diperlukan runtime/seed
+prisma/postgres/derive-schema.mjs
+contoh-impor
+tests

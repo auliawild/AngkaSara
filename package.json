@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "seed": "tsx prisma/seed.ts",
     "seed:admin": "tsx prisma/seed-admin.ts",
-    "seed:skibaca": "tsx prisma/seed-skibaca.ts"
+    "seed:skibaca": "tsx prisma/seed-skibaca.ts",
+    "db:pg:sync": "node prisma/postgres/derive-schema.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

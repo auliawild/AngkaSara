@@ -10,6 +10,42 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-20 — Deploy PRODUKSI: PostgreSQL + Docker Compose (app-only) — SIAP (belum diuji live)
+
+### ✅ Keputusan user
+- **DB produksi: PostgreSQL** (sesuai rencana awal). Dev lokal **tetap SQLite** (Docker/Postgres tak jalan di laptop).
+- **Compose app-only** (port 3000); reverse proxy/HTTPS diatur di luar (nginx/Cloudflare).
+
+### ✅ Mekanisme dua-DB (dev SQLite / prod Postgres) tanpa merusak dev
+- **Adapter dipilih runtime dari skema `DATABASE_URL`** (`postgres://`→PrismaPg, selain itu→better-sqlite3):
+  `src/lib/db.ts` (+`isPostgres`) & helper seed baru `prisma/seed-client.ts` (ketiga seed di-refactor memakainya).
+- **Schema Postgres terpisah** `prisma/postgres/schema.prisma` — **dihasilkan** dari `prisma/schema.prisma`
+  via `prisma/postgres/derive-schema.mjs` (`npm run db:pg:sync`): tukar provider→postgresql, output generator naik 1 level.
+  Model tetap String/Int (tanpa enum/Json native) → sama persis lintas provider.
+- **Config Prisma produksi** `prisma/postgres/prisma.config.ts` (URL dari env, path relatif ke lokasi config).
+  Prisma 7 melarang `url` di schema → wajib lewat config.
+- **Migrasi Postgres** `prisma/postgres/migrations/0_init/` di-generate OFFLINE:
+  `prisma migrate diff --from-empty --to-schema … --script` → **18 tabel, 15 FK, 15 unique index**. Lock provider=postgresql.
+- Client Prisma di-generate PER LINGKUNGAN (dev sqlite / Docker postgres) supaya provider client cocok dgn adapter.
+
+### ✅ Docker
+- **Dockerfile** 3-stage (deps/builder/runner). Builder generate client Postgres (`--config prisma/postgres/prisma.config.ts`)
+  + `next build`. Runner = standalone ramping (tanpa Prisma CLI). `libc6-compat`/`openssl` dipasang.
+- **docker-compose.yml**: `db` (postgres:17, volume `pgdata`, tak ekspos 5432) → `migrate` (image builder,
+  `prisma migrate deploy`, lalu keluar) → `app` (menunggu `migrate` `service_completed_successfully`, port 3000).
+  Service `seed` (profil `seed`, sekali jalan) isi data awal. Semua rahasia dari `.env`.
+- **next.config.ts**: `serverExternalPackages` + pg/better-sqlite3/adapter (native module aman di standalone).
+- `.env.example` diperluas (dev SQLite vs prod Postgres) & **kini di-track** (`.gitignore` `!.env.example`).
+- `.dockerignore`: buang dev.db & artefak tak perlu. **DEPLOY.md** runbook lengkap (up, seed, backup, migrasi baru).
+
+### ✅ Verifikasi (offline — tak ada Docker/Postgres di laptop)
+- `prisma validate` schema Postgres **valid**; SQL migrasi ter-generate (18 tabel).
+- Dev SQLite **utuh**: `tsc` bersih, **npm test 103/103**, `npm run seed` sukses (helper pilih sqlite),
+  `npm run build` sukses. Eslint file berubah bersih.
+- **BELUM diuji live:** `docker compose up --build` & boot perlu dijalankan sekali di server (lihat DEPLOY.md).
+
+---
+
 ## 2026-07-19 — Peringkat gabungan SKIBA Math + SKIBACA (seluruh siswa, per kelas, antar kelas) — TUNTAS
 
 ### ✅ Keputusan user (sebelum dikerjakan)

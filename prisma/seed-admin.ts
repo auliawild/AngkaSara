@@ -6,13 +6,9 @@
  * Password di-hash dgn hasher default Better Auth (better-auth/crypto → scrypt) dan
  * disimpan di account(providerId="credential") supaya cocok saat sign-in.
  */
-import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { hashPassword } from "better-auth/crypto";
-
-const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL as string }) });
+import { prisma } from "./seed-client";
 
 async function main() {
   const email = (process.env.ADMIN_EMAIL || "admin@smkn1badegan.sch.id").toLowerCase();

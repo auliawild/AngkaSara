@@ -1,0 +1,309 @@
+// AngkaSara — skema Prisma PRODUKSI (PostgreSQL).
+//   JANGAN diedit manual — dihasilkan dari prisma/schema.prisma via `npm run db:pg:sync`.
+//   Runtime memilih adapter pg via DATABASE_URL (lihat src/lib/db.ts).
+// Tabel Better Auth (user/account/session/verification) ditambah lewat
+//   npx @better-auth/cli generate  (saat langkah Auth), lalu di-migrate.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // URL untuk Migrate/CLI ada di prisma/postgres/prisma.config.ts; runtime pakai adapter pg.
+}
+
+// CATATAN SQLite: Prisma tidak mendukung `enum` maupun `Json` di SQLite, jadi field
+// enum dijadikan String dengan nilai kanonik (divalidasi di layer aplikasi via Zod),
+// dan Json disimpan sebagai String (JSON.stringify/parse manual). Nilai enum sah:
+//   Tingkat: "X" | "XI" | "XII"
+//   Domain: "NUMERASI" | "LITERASI"
+//   Role: "ADMIN" | "GURU"
+//   PassageSource: "CHECKPOINT" | "SKIBACA"
+
+model Jurusan {
+  id     String  @id @default(cuid())
+  kode   String  @unique
+  nama   String
+  icon   String
+  urutan Int     @default(0)
+  kelas  Kelas[]
+}
+
+model Kelas {
+  id        String    @id @default(cuid())
+  tingkat   String // enum Tingkat: X | XI | XII
+  jurusan   Jurusan   @relation(fields: [jurusanId], references: [id])
+  jurusanId String
+  rombel    Int
+  label     String    @unique // "XI TKJ 2"
+  students  Student[]
+
+  @@unique([tingkat, jurusanId, rombel])
+}
+
+model Student {
+  id          String             @id @default(cuid())
+  nisn        String             @unique
+  nama        String
+  kelas       Kelas              @relation(fields: [kelasId], references: [id])
+  kelasId     String
+  aktif       Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  activities  PracticeActivity[]
+  checkpoints CheckpointResult[]
+  skibaTopics SkibaTopicState[]
+  skibaProfile SkibaProfile?
+  skibacaProgress SkibacaProgress[]
+  skibacaDiagnostics SkibacaDiagnostic[]
+  skibacaSummaries SkibacaSummary[]
+
+  @@index([kelasId])
+}
+
+// ── Better Auth (staf: email+password, RBAC lewat field `role` di User) ──
+// Tabel di bawah adalah skema inti Better Auth (user/session/account/verification)
+// ditulis manual (CLI generate rewel dgn Prisma 7 driver-adapter + output kustom).
+// `role` adalah additionalField Better Auth (lihat src/lib/auth.ts). Nilai: "ADMIN" | "GURU".
+// Staff lama dihapus — identitas staf = User Better Auth ini (name+email+role).
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          String    @default("GURU") // additionalField: ADMIN | GURU
+  nip           String?   @unique // NIP staf (identitas login guru; null utk akun admin lama berbasis email)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+model PracticeActivity {
+  id         String   @id @default(cuid())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId  String
+  kelasLabel String // snapshot saat kejadian
+  domain     String // enum Domain: NUMERASI | LITERASI
+  category   String
+  level      String
+  activity   String
+  score      Int
+  wpm        Int?
+  stars      Int?
+  points     Int?
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([studentId, createdAt])
+  @@index([kelasLabel, createdAt])
+}
+
+model CheckpointResult {
+  id          String    @id @default(cuid())
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  kelasLabel  String
+  period      String // "YYYY-MM"
+  seed        Int
+  numerasi    Int
+  literasi    Int
+  total       Int
+  benarNum    Int
+  totalNum    Int
+  benarLit    Int
+  totalLit    Int
+  durasiDetik Int
+  waktuHabis  Boolean   @default(false)
+  payload     String? // JSON string (SQLite tak dukung Json native)
+  status      String    @default("submitted") // in_progress | submitted
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  @@unique([studentId, period]) // kunci 1x/bulan
+  @@index([kelasLabel, period])
+}
+
+// ── SKIBA Math (Phase 2): progres game numerasi per siswa, terpusat di DB ──
+// Menggantikan localStorage `ls_skiba_topic_state` lama. Satu baris per (siswa, topik).
+// Papan peringkat TIDAK punya tabel sendiri: diturunkan dari PracticeActivity (points desc).
+model SkibaTopicState {
+  id          String   @id @default(cuid())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  topicId     String // salah satu TOPICS[].id di src/lib/soal-numerasi.ts
+  maxUnlocked Int      @default(1) // level tertinggi yang boleh dimainkan (1..20)
+  score       Int      @default(0) // akumulasi points (combo) di topik ini
+  recLevel    Int      @default(1) // level rekomendasi dari tes diagnostik
+  progress    String   @default("[]") // JSON string: number[] level yang pernah diselesaikan
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, topicId])
+  @@index([studentId])
+}
+
+// Profil SKIBA per siswa — menampung kuota tes diagnostik (maks 2x, seumur akun).
+model SkibaProfile {
+  id           String   @id @default(cuid())
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String   @unique
+  diagAttempts Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+// ── SKIBACA (Phase 3): bacaan literasi per jurusan/level, terpusat di DB ──
+// 5 jurusan × 5 level × 15 bacaan kuis = 375 (ringkasan 16-20 disembunyikan untuk rilis awal).
+// Tabel terpisah dari ReadingPassage (Check Point) karena berstruktur jurusan×level×urutan.
+// Konten di-seed dari prisma/data/skibaca.json (npm run seed:skibaca).
+model SkibacaPassage {
+  id          String            @id @default(cuid())
+  jurusanKode String // TKR | TSM | TKJ | Kuliner | TPTUP
+  jurusanFull String
+  icon        String
+  level       Int // 1..5
+  urutan      Int // 1..20
+  tipe        String            @default("kuis") // "kuis" (1..15) | "ringkasan" (16..20, ditulis siswa & dinilai guru)
+  title       String
+  text        String
+  wordCount   Int
+  questions   SkibacaQuestion[]
+  progress    SkibacaProgress[]
+  summaries   SkibacaSummary[]
+
+  @@unique([jurusanKode, level, urutan])
+  @@index([jurusanKode, level])
+}
+
+model SkibacaQuestion {
+  id          String         @id @default(cuid())
+  passage     SkibacaPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId   String
+  urutan      Int
+  q           String
+  options     String // JSON string: string[4] (urutan kanonik hasil shuffle seed). SQLite tak dukung Json.
+  answerIndex Int
+
+  @@index([passageId])
+}
+
+model SkibacaProgress {
+  id        String         @id @default(cuid())
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+  passage   SkibacaPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId String
+  percent   Int // skor kuis 0..100 (terbaik dipertahankan)
+  wpm       Int // kata per menit saat capaian terbaik
+  updatedAt DateTime       @updatedAt
+
+  @@unique([studentId, passageId])
+  @@index([studentId])
+}
+
+// Ringkasan/parafrase SKIBACA (bacaan 16..20) yang ditulis siswa dengan bahasanya sendiri.
+// TIDAK dinilai otomatis: guru menilai manual (skor + catatan) di dashboard. Boleh ditulis
+// ulang selama belum/ sudah dinilai (upsert; menulis ulang mereset penilaian guru).
+model SkibacaSummary {
+  id        String         @id @default(cuid())
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+  passage   SkibacaPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId String
+  text      String // ringkasan siswa
+  wordCount Int
+  score     Int? // skor 0..100 dari guru; null = belum dinilai
+  feedback  String? // catatan guru
+  gradedAt  DateTime? // waktu dinilai; null = menunggu penilaian
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([studentId, passageId])
+  @@index([studentId])
+  @@index([gradedAt]) // filter "menunggu penilaian" di dashboard guru
+}
+
+// Hasil Tes Diagnostik SKIBACA per siswa per jurusan (saran level awal, bukan unlock —
+// semua bacaan tetap terbuka). Server-graded; boleh diulang (upsert menimpa hasil lama).
+model SkibacaDiagnostic {
+  id          String   @id @default(cuid())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  jurusanKode String
+  recommended Int // level rekomendasi 1..5
+  scores      String // JSON: { "1": 80, "2": 60, ... } skor% per level yang diujikan
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, jurusanKode])
+  @@index([studentId])
+}
+
+model ReadingPassage {
+  id        String            @id @default(cuid())
+  kode      String            @unique
+  tema      String
+  title     String
+  text      String
+  source    String            @default("CHECKPOINT") // enum PassageSource: CHECKPOINT | SKIBACA
+  aktif     Boolean           @default(true)
+  questions ReadingQuestion[]
+}
+
+model ReadingQuestion {
+  id          String         @id @default(cuid())
+  passage     ReadingPassage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passageId   String
+  urutan      Int
+  q           String
+  options     String // JSON string: string[4] (urutan kanonik). SQLite tak dukung Json.
+  answerIndex Int // index kunci di options
+
+  @@index([passageId])
+}
