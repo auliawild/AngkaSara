@@ -282,6 +282,12 @@ export async function submitDiagnostik(input: {
 
   const existing = await prisma.skibaTopicState.findMany({ where: { studentId: sesi.studentId } });
   const byId = new Map(existing.map((r) => [r.topicId, r]));
+  // Simpan skor & waktu diagnostik sebagai baseline grafik perkembangan (raport).
+  await prisma.skibaProfile.upsert({
+    where: { studentId: sesi.studentId },
+    create: { studentId: sesi.studentId, diagAttempts: 1, diagScore: hasil.pct, diagAt: new Date() },
+    update: { diagScore: hasil.pct, diagAt: new Date() },
+  });
   await prisma.$transaction(
     hasil.rincian.map((r) => {
       const cur = byId.get(r.topicId);
@@ -303,37 +309,4 @@ export async function submitDiagnostik(input: {
 
   revalidatePath("/siswa/skiba");
   return { ok: true, hasil };
-}
-
-/* ===================== PAPAN PERINGKAT ===================== */
-export interface BarisPeringkat {
-  nama: string;
-  kelasLabel: string;
-  topic: string;
-  level: string;
-  points: number;
-  detail: string;
-  tanggal: string;
-  isMe: boolean;
-}
-
-/** Papan peringkat: 50 skor (points) tertinggi dari PracticeActivity numerasi. */
-export async function muatPeringkat(): Promise<BarisPeringkat[]> {
-  const sesi = await sesiSiswa();
-  const rows = await prisma.practiceActivity.findMany({
-    where: { domain: "NUMERASI", points: { gt: 0 } },
-    orderBy: { points: "desc" },
-    take: 50,
-    include: { student: { select: { id: true, nama: true } } },
-  });
-  return rows.map((r) => ({
-    nama: r.student.nama,
-    kelasLabel: r.kelasLabel,
-    topic: r.category,
-    level: r.level,
-    points: r.points ?? 0,
-    detail: r.detail ?? "",
-    tanggal: r.createdAt.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }),
-    isMe: sesi?.studentId === r.student.id,
-  }));
 }

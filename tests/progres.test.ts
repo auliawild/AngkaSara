@@ -23,6 +23,8 @@ describe("agregatProgres — harian", () => {
     expect(hariIni).toMatchObject({ total: 2, jumlahNum: 1, jumlahLit: 1, num: 80, lit: 60, poin: 10 });
     expect(d.titik[12]).toMatchObject({ total: 1, num: 100, lit: null });
     expect(d.totalAktivitas).toBe(3); // yang 1 Juni diabaikan
+    expect(d.totalNum).toBe(2); // 2 pengerjaan numerasi
+    expect(d.totalLit).toBe(1); // 1 pengerjaan literasi
     expect(d.totalPoin).toBe(15);
     expect(d.bucketAktif).toBe(2);
     expect(d.rataNum).toBe(90); // (80+100)/2

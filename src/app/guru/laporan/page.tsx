@@ -58,16 +58,22 @@ export default async function LaporanPage({
               <span className="mr-1">{ikonJurusan(d.kelas)}</span>
               {d.kelas} · {d.baris.length} siswa
             </h2>
-            {isAdmin ? (
+            <div className="flex flex-wrap items-center gap-2">
               <Link
-                href={`/guru/laporan/cetak-kelas?kelas=${encodeURIComponent(d.kelas)}&semester=${d.semesterId}`}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                href={`/guru/laporan/cetak-progres-kelas?kelas=${encodeURIComponent(d.kelas)}`}
+                className="rounded-lg border border-blue-600 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/40"
               >
-                🖨️ Cetak Raport Sekelas
+                🖨️ Cetak Progres Sekelas
               </Link>
-            ) : (
-              <span className="text-xs text-zinc-500">Klik nama untuk melihat progres</span>
-            )}
+              {isAdmin && (
+                <Link
+                  href={`/guru/laporan/cetak-kelas?kelas=${encodeURIComponent(d.kelas)}&semester=${d.semesterId}`}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  🖨️ Cetak Raport Sekelas
+                </Link>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

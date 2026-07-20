@@ -28,9 +28,11 @@ export interface ProgresData {
   mode: BucketMode;
   titik: TitikProgres[]; // urut lama → baru
   totalAktivitas: number;
+  totalNum: number; // jumlah pengerjaan numerasi (kuantitas)
+  totalLit: number; // jumlah pengerjaan literasi (kuantitas)
   totalPoin: number;
   bucketAktif: number; // jumlah bucket yang ada aktivitas
-  rataNum: number | null; // rata skor numerasi seluruh jendela
+  rataNum: number | null; // rata skor numerasi seluruh jendela (mutu capaian)
   rataLit: number | null;
 }
 
@@ -85,6 +87,8 @@ export function agregatProgres(
     mode,
     titik,
     totalAktivitas: titik.reduce((s, t) => s + t.total, 0),
+    totalNum: cntNumAll,
+    totalLit: cntLitAll,
     totalPoin: titik.reduce((s, t) => s + t.poin, 0),
     bucketAktif: titik.filter((t) => t.total > 0).length,
     rataNum: cntNumAll ? Math.round(sumNumAll / cntNumAll) : null,

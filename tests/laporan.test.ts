@@ -4,6 +4,9 @@ import {
   agregatCheckpoint,
   agregatSkiba,
   agregatSkibaca,
+  agregatDiagNumerasi,
+  agregatDiagLiterasi,
+  bangunPerkembangan,
   bangunRaport,
   barisDariRaport,
   type CpRow,
@@ -70,12 +73,19 @@ describe("bangunRaport / barisDariRaport", () => {
       skibaStates: [{ topicId: "tambah", score: 50, progress: [1, 2, 3] }],
       skibacaProgress: [{ percent: 100, wpm: 60 }],
       skibacaSummaries: [{ score: 88 }],
+      diagNum: { score: 60, levelRata: 12, at: null },
+      diagLit: { jurusanKode: "TKR", recommended: 2, rataScore: 70, at: null },
       aktivitasNumerasi: 4,
       aktivitasLiterasi: 2,
     });
     expect(r.cp.total).toBe(85);
     expect(r.skiba.levelSelesai).toBe(3);
     expect(r.skibaca.bacaanSelesai).toBe(1);
+    // perkembangan: titik awal (diagnostik) + 1 bulan Check Point
+    expect(r.perkembangan).toEqual([
+      { label: "Awal", numerasi: 60, literasi: 70 },
+      { label: "Jul 2026", numerasi: 90, literasi: 80 },
+    ]);
 
     const b = barisDariRaport("s1", r);
     expect(b).toMatchObject({
@@ -88,6 +98,55 @@ describe("bangunRaport / barisDariRaport", () => {
       aktivitas: 6,
     });
     expect(b.klas?.label).toBe("Baik");
+  });
+});
+
+describe("agregatDiagNumerasi", () => {
+  it("rata recLevel; null bila skor tak ada", () => {
+    const a = agregatDiagNumerasi({ score: 55, at: "2026-07-01T00:00:00.000Z", recLevels: [10, 12, 14] });
+    expect(a).toEqual({ score: 55, levelRata: 12, at: "2026-07-01T00:00:00.000Z" });
+    expect(agregatDiagNumerasi({ score: null, at: null, recLevels: [] })).toBeNull();
+  });
+  it("tanpa recLevels → levelRata diturunkan dari skor", () => {
+    // skor 50 → round(50/100*19)+1 = 11
+    expect(agregatDiagNumerasi({ score: 50, at: null, recLevels: [] })?.levelRata).toBe(11);
+  });
+});
+
+describe("agregatDiagLiterasi", () => {
+  it("rata skor antar level; null bila input null", () => {
+    const a = agregatDiagLiterasi({ jurusanKode: "TKR", recommended: 3, scores: { "1": 80, "2": 60 }, at: null });
+    expect(a).toEqual({ jurusanKode: "TKR", recommended: 3, rataScore: 70, at: null });
+    expect(agregatDiagLiterasi(null)).toBeNull();
+  });
+});
+
+describe("bangunPerkembangan", () => {
+  it("titik Awal (diagnostik) lalu Check Point terurut; label bulan singkat", () => {
+    const t = bangunPerkembangan({
+      diagNumerasi: 40,
+      diagLiterasi: 55,
+      cpRows: [
+        { period: "2026-09", numerasi: 70, literasi: 65, total: 68 },
+        { period: "2026-07", numerasi: 60, literasi: 60, total: 60 },
+      ],
+    });
+    expect(t).toEqual([
+      { label: "Awal", numerasi: 40, literasi: 55 },
+      { label: "Jul 2026", numerasi: 60, literasi: 60 },
+      { label: "Sep 2026", numerasi: 70, literasi: 65 },
+    ]);
+  });
+  it("tanpa diagnostik → tak ada titik Awal; satu domain null tetap muncul", () => {
+    const t = bangunPerkembangan({
+      diagNumerasi: null,
+      diagLiterasi: 50,
+      cpRows: [],
+    });
+    expect(t).toEqual([{ label: "Awal", numerasi: null, literasi: 50 }]);
+  });
+  it("kosong total → array kosong", () => {
+    expect(bangunPerkembangan({ diagNumerasi: null, diagLiterasi: null, cpRows: [] })).toEqual([]);
   });
 });
 

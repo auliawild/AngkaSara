@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { urutkanKelas } from "@/lib/kelas";
 import {
+  agregatDiagLiterasi,
+  agregatDiagNumerasi,
   bangunRaport,
   barisDariRaport,
   type BarisKelas,
@@ -64,6 +66,21 @@ function parseProgress(json: string): number[] {
   }
 }
 
+/** Parse skor diagnostik SKIBACA ({"1":80,...}) jadi Record<string, number>. */
+function parseScores(json: string): Record<string, number> {
+  try {
+    const obj = JSON.parse(json);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(obj)) if (typeof v === "number") out[k] = v;
+      return out;
+    }
+  } catch {
+    /* abaikan */
+  }
+  return {};
+}
+
 /** Semester terpilih (default: semester berjalan) dari id URL. */
 function pilihSemester(id?: string): Semester {
   return (id && parseSemester(id)) || semesterDari();
@@ -84,14 +101,14 @@ async function kumpulkanRaport(
 
   const { mulai, selesai, periods } = rentangSemester(s);
 
-  const [cpRows, skibaRows, progRows, sumRows, aktRows] = await Promise.all([
+  const [cpRows, skibaRows, progRows, sumRows, aktRows, profRows, diagLitRows] = await Promise.all([
     prisma.checkpointResult.findMany({
       where: { studentId: { in: ids }, status: "submitted", period: { in: periods } },
       select: { studentId: true, period: true, numerasi: true, literasi: true, total: true },
     }),
     prisma.skibaTopicState.findMany({
       where: { studentId: { in: ids } },
-      select: { studentId: true, score: true, progress: true },
+      select: { studentId: true, score: true, progress: true, recLevel: true },
     }),
     prisma.skibacaProgress.findMany({
       where: { studentId: { in: ids } },
@@ -106,6 +123,15 @@ async function kumpulkanRaport(
       where: { studentId: { in: ids }, createdAt: { gte: mulai, lt: selesai } },
       _count: { _all: true },
     }),
+    prisma.skibaProfile.findMany({
+      where: { studentId: { in: ids } },
+      select: { studentId: true, diagScore: true, diagAt: true },
+    }),
+    prisma.skibacaDiagnostic.findMany({
+      where: { studentId: { in: ids } },
+      select: { studentId: true, jurusanKode: true, recommended: true, scores: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" }, // paling baru dulu → dipakai per siswa
+    }),
   ]);
 
   const cpBy = new Map<string, CpRow[]>();
@@ -115,11 +141,20 @@ async function kumpulkanRaport(
     cpBy.set(r.studentId, arr);
   }
   const skibaBy = new Map<string, SkibaState[]>();
+  const recLevelsBy = new Map<string, number[]>();
   for (const r of skibaRows) {
     const arr = skibaBy.get(r.studentId) ?? [];
     arr.push({ topicId: "", score: r.score, progress: parseProgress(r.progress) });
     skibaBy.set(r.studentId, arr);
+    const rl = recLevelsBy.get(r.studentId) ?? [];
+    rl.push(r.recLevel);
+    recLevelsBy.set(r.studentId, rl);
   }
+  const profBy = new Map<string, { diagScore: number | null; diagAt: Date | null }>();
+  for (const r of profRows) profBy.set(r.studentId, { diagScore: r.diagScore, diagAt: r.diagAt });
+  // diagLitRows sudah urut updatedAt desc → ambil yang PERTAMA per siswa (terbaru).
+  const diagLitBy = new Map<string, (typeof diagLitRows)[number]>();
+  for (const r of diagLitRows) if (!diagLitBy.has(r.studentId)) diagLitBy.set(r.studentId, r);
   const progBy = new Map<string, SkibacaProg[]>();
   for (const r of progRows) {
     const arr = progBy.get(r.studentId) ?? [];
@@ -141,6 +176,23 @@ async function kumpulkanRaport(
   }
 
   for (const st of students) {
+    const prof = profBy.get(st.id);
+    const diagNum = agregatDiagNumerasi({
+      score: prof?.diagScore ?? null,
+      at: prof?.diagAt ? prof.diagAt.toISOString() : null,
+      recLevels: recLevelsBy.get(st.id) ?? [],
+    });
+    const dl = diagLitBy.get(st.id);
+    const diagLit = agregatDiagLiterasi(
+      dl
+        ? {
+            jurusanKode: dl.jurusanKode,
+            recommended: dl.recommended,
+            scores: parseScores(dl.scores),
+            at: dl.updatedAt.toISOString(),
+          }
+        : null,
+    );
     out.set(
       st.id,
       bangunRaport({
@@ -149,6 +201,8 @@ async function kumpulkanRaport(
         skibaStates: skibaBy.get(st.id) ?? [],
         skibacaProgress: progBy.get(st.id) ?? [],
         skibacaSummaries: sumBy.get(st.id) ?? [],
+        diagNum,
+        diagLit,
         aktivitasNumerasi: aktNum.get(st.id) ?? 0,
         aktivitasLiterasi: aktLit.get(st.id) ?? 0,
       }),
@@ -288,4 +342,109 @@ export async function muatProgresSiswa(params: { siswaId: string; mode?: string 
     akt.map((a) => ({ ts: a.createdAt, domain: a.domain, score: a.score, points: a.points ?? 0 })),
     mode,
   );
+}
+
+/** Label jendela untuk tiap mode (dipakai judul cetak progres). */
+export const KET_MODE: Record<BucketMode, string> = {
+  hari: "14 hari terakhir",
+  minggu: "12 minggu terakhir",
+  bulan: "12 bulan terakhir",
+  tahun: "5 tahun terakhir",
+};
+
+export interface ProgresCetakSiswa {
+  nama: string;
+  nisn: string;
+  kelasLabel: string;
+  mode: BucketMode;
+  prog: ProgresData;
+}
+
+/** Progres latihan satu siswa + identitas (untuk lembar cetak perorangan). Null bila siswa tak ada. */
+export async function muatProgresCetakSiswa(params: { siswaId: string; mode?: string }): Promise<ProgresCetakSiswa | null> {
+  await requireStaf();
+  const st = await prisma.student.findUnique({
+    where: { id: params.siswaId },
+    select: { id: true, nama: true, nisn: true, kelas: { select: { label: true } } },
+  });
+  if (!st) return null;
+
+  const mode = pilihMode(params.mode);
+  const sejak = new Date();
+  sejak.setDate(sejak.getDate() - 400);
+  const akt = await prisma.practiceActivity.findMany({
+    where: { studentId: st.id, createdAt: { gte: sejak } },
+    select: { createdAt: true, domain: true, score: true, points: true },
+  });
+  const prog = agregatProgres(
+    akt.map((a) => ({ ts: a.createdAt, domain: a.domain, score: a.score, points: a.points ?? 0 })),
+    mode,
+  );
+  return { nama: st.nama, nisn: st.nisn, kelasLabel: st.kelas.label, mode, prog };
+}
+
+export interface BarisProgresKelas {
+  siswaId: string;
+  nama: string;
+  nisn: string;
+  totalNum: number; // jumlah pengerjaan numerasi
+  totalLit: number; // jumlah pengerjaan literasi
+  totalPoin: number;
+  rataNum: number | null; // mutu: rata skor numerasi
+  rataLit: number | null;
+}
+export interface ProgresKelas {
+  kelas: string;
+  mode: BucketMode;
+  baris: BarisProgresKelas[];
+}
+
+/**
+ * Rekap progres latihan seluruh siswa aktif satu kelas untuk satu mode (tabel cetak sekelas).
+ * Tarik PracticeActivity ≤400 hari sekali, agregat per siswa (jendela sesuai mode). Null bila kelas tak dikenal.
+ */
+export async function muatProgresKelas(params: { kelas: string; mode?: string }): Promise<ProgresKelas | null> {
+  await requireStaf();
+  const kelasRow = await prisma.kelas.findUnique({ where: { label: params.kelas }, select: { label: true } });
+  if (!kelasRow) return null;
+
+  const mode = pilihMode(params.mode);
+  const students = await prisma.student.findMany({
+    where: { aktif: true, kelas: { label: params.kelas } },
+    select: { id: true, nama: true, nisn: true },
+    orderBy: { nama: "asc" },
+  });
+  const ids = students.map((s) => s.id);
+
+  const sejak = new Date();
+  sejak.setDate(sejak.getDate() - 400);
+  const akt = ids.length
+    ? await prisma.practiceActivity.findMany({
+        where: { studentId: { in: ids }, createdAt: { gte: sejak } },
+        select: { studentId: true, createdAt: true, domain: true, score: true, points: true },
+      })
+    : [];
+
+  const byStudent = new Map<string, { ts: Date; domain: string; score: number; points: number }[]>();
+  for (const a of akt) {
+    const arr = byStudent.get(a.studentId) ?? [];
+    arr.push({ ts: a.createdAt, domain: a.domain, score: a.score, points: a.points ?? 0 });
+    byStudent.set(a.studentId, arr);
+  }
+
+  const baris: BarisProgresKelas[] = students.map((st) => {
+    const prog = agregatProgres(byStudent.get(st.id) ?? [], mode);
+    return {
+      siswaId: st.id,
+      nama: st.nama,
+      nisn: st.nisn,
+      totalNum: prog.totalNum,
+      totalLit: prog.totalLit,
+      totalPoin: prog.totalPoin,
+      rataNum: prog.rataNum,
+      rataLit: prog.rataLit,
+    };
+  });
+
+  return { kelas: params.kelas, mode, baris };
 }

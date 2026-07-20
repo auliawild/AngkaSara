@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { muatRaportKelas } from "@/server/laporan";
 import { ikonJurusan } from "@/lib/kelas";
 import CetakTombol from "../cetak-tombol";
+import CetakWatermark from "../cetak-watermark";
 import RaportSheet from "../raport-sheet";
 import { TandaTanganProvider, PanelTandaTangan } from "../tanda-tangan";
 
@@ -53,6 +54,7 @@ export default async function CetakKelasPage({
       ) : (
         <TandaTanganProvider>
           <PanelTandaTangan />
+          <CetakWatermark />
           {d.daftar.map((x) => (
             <RaportSheet key={x.id} r={x.raport} semesterLabel={d.semesterLabel} tahunAjaran={d.tahunAjaran} />
           ))}

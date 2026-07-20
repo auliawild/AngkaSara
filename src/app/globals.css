@@ -57,14 +57,51 @@ body {
   .as-lift { transition: none; }
 }
 
-/* ===== Cetak (raport) ===== */
+/* ===== Cetak (raport & progres) ===== */
+/* Lembar A4: tampil sebagai halaman berukuran A4 baik di layar maupun saat dicetak. */
+.cetak-lembar {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  padding: 15mm;
+  margin-inline: auto;
+  background: #fff;
+  color: #18181b;
+}
+/* Watermark logo sekolah — hanya muncul saat cetak, berulang di SETIAP halaman. */
+.cetak-watermark { display: none; }
+
 @media print {
-  @page { size: A4; margin: 14mm; }
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff !important; color: #111 !important; }
   .no-print { display: none !important; }
-  body { background: #fff !important; color: #111 !important; }
-  /* Cetak lembar raport apa adanya (kop, tabel, tanda tangan) tanpa terpotong tak wajar. */
-  .cetak-raport { box-shadow: none !important; border: none !important; }
-  .cetak-raport, .cetak-raport * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  /* Cetak sekelas: tiap lembar raport berikutnya mulai di halaman baru. */
-  .cetak-raport + .cetak-raport { break-before: page; page-break-before: always; }
+
+  /* Lembar cetak apa adanya (kop, tabel, tanda tangan), tepat satu halaman A4. */
+  .cetak-lembar {
+    width: 210mm;
+    min-height: 297mm;
+    max-width: none;
+    margin: 0 auto;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  .cetak-lembar, .cetak-lembar * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Cetak sekelas: tiap lembar berikutnya mulai di halaman baru. */
+  .cetak-lembar + .cetak-lembar { break-before: page; page-break-before: always; }
+
+  /* Watermark tercetak di tiap halaman (position: fixed diulang per halaman oleh mesin cetak). */
+  .cetak-watermark {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    z-index: 0;
+    opacity: 0.06;
+    pointer-events: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .cetak-watermark img { width: 60%; max-width: 130mm; object-fit: contain; }
 }

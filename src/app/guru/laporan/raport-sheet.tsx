@@ -5,11 +5,20 @@
 import { BULAN_PANJANG, ikonJurusan } from "@/lib/kelas";
 import { SKIBA_TOTAL_LEVEL, SKIBA_TOTAL_TOPIK, type RaportSiswa } from "@/lib/laporan";
 import { SEKOLAH } from "@/lib/sekolah";
+import KopSekolah from "./kop-sekolah";
+import PerkembanganChart from "./perkembangan-chart";
 import { BlokTandaTangan } from "./tanda-tangan";
 
 function labelBulan(period: string): string {
   const [th, bl] = period.split("-");
   return `${BULAN_PANJANG[Number(bl) - 1]} ${th}`;
+}
+
+function formatTgl(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.getDate()} ${BULAN_PANJANG[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function deskripsiNaratif(nama: string, total: number | null, klasLabel?: string): string {
@@ -34,35 +43,18 @@ export default function RaportSheet({
   tahunAjaran: string;
 }) {
   return (
-    <article className="cetak-raport relative isolate rounded-xl border border-black/10 bg-white p-8 text-zinc-900 shadow-sm">
+    <article className="cetak-raport cetak-lembar relative isolate rounded-xl border border-black/10 text-zinc-900 shadow-sm">
       {/*
-        Watermark lambang sekolah. `-z-10` + `isolate` di induk membuatnya tergambar DI ATAS latar
-        putih lembar tapi DI BAWAH seluruh teks, jadi tak mengganggu keterbacaan. `print-color-adjust`
-        agar tetap ikut tercetak saat browser mengabaikan warna latar.
+        Watermark lambang sekolah untuk pratinjau LAYAR (per lembar). Saat CETAK dipakai
+        `<CetakWatermark/>` (fixed) supaya muncul di setiap halaman — maka di sini `no-print`.
       */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+      <div aria-hidden className="no-print pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={SEKOLAH.logo}
-          alt=""
-          className="w-3/5 max-w-[420px] object-contain opacity-[0.06]"
-          style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as React.CSSProperties}
-        />
+        <img src={SEKOLAH.logo} alt="" className="w-3/5 max-w-[420px] object-contain opacity-[0.06]" />
       </div>
 
       {/* Kop sekolah */}
-      <header className="flex items-center gap-4 border-b-2 border-zinc-800 pb-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={SEKOLAH.logo} alt="Logo sekolah" width={68} height={68} className="h-17 w-17 object-contain" />
-        <div className="flex-1 text-center leading-snug">
-          <h1 className="text-lg font-black tracking-wide">{SEKOLAH.nama}</h1>
-          <p className="text-xs">{SEKOLAH.alamat}</p>
-          <p className="text-[11px] text-zinc-600">
-            Telepon/Faksimile {SEKOLAH.telepon}, Pos-el : {SEKOLAH.email}
-          </p>
-        </div>
-        <div className="w-17" />
-      </header>
+      <KopSekolah />
 
       {/* Judul dokumen — dua baris */}
       <h2 className="mt-5 text-center text-base font-bold uppercase leading-snug tracking-wider">
@@ -180,9 +172,63 @@ export default function RaportSheet({
         </p>
       </section>
 
-      {/* C. Catatan */}
+      {/* C. Hasil Tes Diagnostik (asesmen awal) */}
       <section className="mt-5">
-        <h3 className="text-sm font-bold">C. Catatan</h3>
+        <h3 className="text-sm font-bold">C. Hasil Tes Diagnostik (Asesmen Awal)</h3>
+        {!r.diagNum && !r.diagLit ? (
+          <p className="mt-1 text-sm text-zinc-500">Siswa belum mengikuti tes diagnostik awal (SKIBA Math / SKIBACA).</p>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg border border-zinc-300 p-3">
+              <div className="font-semibold">🧮 Diagnostik Numerasi (SKIBA)</div>
+              {r.diagNum ? (
+                <ul className="mt-1 space-y-0.5 text-zinc-700">
+                  <li>
+                    Skor awal: <b>{r.diagNum.score}</b>%
+                  </li>
+                  <li>
+                    Level rekomendasi rata-rata: <b>{r.diagNum.levelRata}</b> / 20
+                  </li>
+                  <li className="text-xs text-zinc-500">Dikerjakan: {formatTgl(r.diagNum.at)}</li>
+                </ul>
+              ) : (
+                <p className="mt-1 text-zinc-500">Belum dikerjakan.</p>
+              )}
+            </div>
+            <div className="rounded-lg border border-zinc-300 p-3">
+              <div className="font-semibold">📖 Diagnostik Literasi (SKIBACA)</div>
+              {r.diagLit ? (
+                <ul className="mt-1 space-y-0.5 text-zinc-700">
+                  <li>
+                    Skor awal: <b>{r.diagLit.rataScore}</b>%
+                  </li>
+                  <li>
+                    Level saran: <b>{r.diagLit.recommended}</b> / 5 · Jurusan {r.diagLit.jurusanKode}
+                  </li>
+                  <li className="text-xs text-zinc-500">Dikerjakan: {formatTgl(r.diagLit.at)}</li>
+                </ul>
+              ) : (
+                <p className="mt-1 text-zinc-500">Belum dikerjakan.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* D. Lampiran — Grafik Perkembangan */}
+      <section className="mt-5">
+        <h3 className="text-sm font-bold">D. Lampiran — Grafik Perkembangan</h3>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Dari tes diagnostik awal ke skor Check Point tiap bulan (skala 0–100).
+        </p>
+        <div className="mt-2 rounded-lg border border-zinc-300 p-2">
+          <PerkembanganChart titik={r.perkembangan} />
+        </div>
+      </section>
+
+      {/* E. Catatan */}
+      <section className="mt-5">
+        <h3 className="text-sm font-bold">E. Catatan</h3>
         <p className="mt-1 text-sm text-zinc-700">{deskripsiNaratif(r.nama, r.cp.total, r.cp.klas?.label)}</p>
       </section>
 

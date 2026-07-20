@@ -1,25 +1,23 @@
 "use client";
 /**
- * SKIBA Math — UI klien (Phase 2). Orkestrasi hub/diagnostik/arena/peringkat.
+ * SKIBA Math — UI klien (Phase 2). Orkestrasi hub/diagnostik/arena/progres.
  *
  * Keamanan: soal datang TERSANITASI dari server (tanpa kunci), jadi TAK ADA
  * umpan-balik benar/salah saat mengerjakan (persis Check Point). "Juice" game
  * (bintang, combo, confetti, suara sukses) tampil di LAYAR HASIL berdasarkan
  * penilaian server. Suara netral (klik/tik) tetap ada saat bermain.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   muatSkiba,
   mulaiArena,
   submitArena,
   mulaiDiagnostik,
   submitDiagnostik,
-  muatPeringkat,
   type SkibaData,
   type TopikState,
   type SubmitArenaHasil,
   type SubmitDiagHasil,
-  type BarisPeringkat,
 } from "@/server/skiba";
 import type { SoalKlien } from "@/lib/skiba";
 
@@ -124,7 +122,7 @@ function levelColor(L: number): string {
 }
 
 /* ===================== komponen utama ===================== */
-type Mode = "hub" | "diag" | "arena" | "peringkat";
+type Mode = "hub" | "diag" | "arena" | "progres";
 
 export default function SkibaClient({ awal }: { awal: SkibaData }) {
   const [data, setData] = useState<SkibaData>(awal);
@@ -147,7 +145,7 @@ export default function SkibaClient({ awal }: { awal: SkibaData }) {
           [
             ["hub", "🏠 Topik"],
             ["diag", "🧪 Diagnostik"],
-            ["peringkat", "🏆 Peringkat"],
+            ["progres", "📊 Progres"],
           ] as [Mode, string][]
         ).map(([m, label]) => (
           <button
@@ -186,7 +184,7 @@ export default function SkibaClient({ awal }: { awal: SkibaData }) {
           onKeHub={() => setMode("hub")}
         />
       )}
-      {mode === "peringkat" && <Peringkat />}
+      {mode === "progres" && <Progres data={data} />}
     </>
   );
 }
@@ -768,65 +766,66 @@ function Kuis({
 }
 
 /* ===================== PAPAN PERINGKAT ===================== */
-function Peringkat() {
-  const [rows, setRows] = useState<BarisPeringkat[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const muat = useCallback(async () => {
-    setError(null);
-    try {
-      setRows(await muatPeringkat());
-    } catch (e) {
-      setError((e as Error).message || "Gagal memuat.");
-    }
-  }, []);
-  useEffect(() => {
-    muat();
-  }, [muat]);
-
-  const medali = useMemo(() => ["🥇", "🥈", "🥉"], []);
-
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
-  if (rows === null) return <p className="text-sm text-zinc-500">Memuat papan peringkat…</p>;
-  if (rows.length === 0)
-    return (
-      <p className="rounded-xl border border-black/10 p-6 text-center text-sm text-zinc-500 dark:border-white/15">
-        Belum ada skor. Ayo main di Arena dan jadi yang pertama! 🚀
-      </p>
-    );
+/* ===================== PROGRES pribadi (bukan kompetisi) ===================== */
+function Progres({ data }: { data: SkibaData }) {
+  const totalLevel = data.topik.reduce((s, t) => s + t.progress.length, 0);
+  const topikTuntas = data.topik.filter((t) => t.progress.length >= 20).length;
+  const topikDibuka = data.topik.filter((t) => t.maxUnlocked > 1 || t.progress.length > 0).length;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-black/10 dark:border-white/15">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-black/[.03] text-xs uppercase text-zinc-500 dark:bg-white/[.04]">
-          <tr>
-            <th className="px-3 py-2">#</th>
-            <th className="px-3 py-2">Nama</th>
-            <th className="px-3 py-2">Kelas</th>
-            <th className="px-3 py-2">Topik</th>
-            <th className="px-3 py-2 text-right">Poin</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr
-              key={i}
-              className={
-                "border-t border-black/5 dark:border-white/10 " +
-                (r.isMe ? "bg-blue-50 font-semibold dark:bg-blue-950/30" : "")
-              }
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Total Skor" nilai={data.totalScore.toLocaleString("id-ID")} />
+        <Stat label="Level dilalui" nilai={`${totalLevel}/200`} />
+        <Stat label="Topik dibuka" nilai={`${topikDibuka}/10`} />
+        <Stat label="Topik tuntas" nilai={`${topikTuntas}/10`} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {data.topik.map((t) => {
+          const selesai = t.progress.length;
+          const persen = Math.round((selesai / 20) * 100);
+          return (
+            <div
+              key={t.topicId}
+              className="rounded-2xl border border-black/10 bg-white/60 p-4 dark:border-white/15 dark:bg-white/5"
             >
-              <td className="px-3 py-2">{i < 3 ? medali[i] : i + 1}</td>
-              <td className="px-3 py-2">{r.nama}{r.isMe && " (kamu)"}</td>
-              <td className="px-3 py-2 text-zinc-500">{r.kelasLabel}</td>
-              <td className="px-3 py-2 text-zinc-500">
-                {r.topic} · {r.level}
-              </td>
-              <td className="px-3 py-2 text-right font-bold">{r.points.toLocaleString("id-ID")}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{t.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">{t.name}</span>
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold text-white"
+                      style={{ backgroundColor: levelColor(t.maxUnlocked) }}
+                    >
+                      Lv {t.maxUnlocked}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
+                    <span>⭐ {t.score.toLocaleString("id-ID")}</span>
+                    <span>·</span>
+                    <span>{selesai}/20 level selesai</span>
+                    <span>·</span>
+                    <span>🧪 saran diagnostik: Lv {t.recLevel}</span>
+                  </div>
+                </div>
+              </div>
+              {/* bar progres level selesai menuju 20 */}
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${persen}%`, backgroundColor: levelColor(t.maxUnlocked) }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-center text-xs text-zinc-500">
+        Ini progres pribadimu. Ingin lihat papan peringkat sekolah? Buka menu <b>Peringkat</b> di dasbor.
+      </p>
     </div>
   );
 }

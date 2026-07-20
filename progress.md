@@ -10,6 +10,90 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-20 — Raport A4 + watermark tiap halaman + cetak Progres Latihan (perorangan & sekelas) — TUNTAS
+
+### ✅ Keputusan user
+- **Progres Latihan** (nama dipertahankan): tampil **jumlah pengerjaan numerasi & literasi TERPISAH** (kuantitas)
+  + **mutu capaian** (rata nilai) tiap **hari/minggu/bulan**. Bisa **dicetak perorangan & sekelas** oleh **guru + admin**.
+- **Cetak sekelas** = **tabel rekap 1 halaman** (baris siswa, kolom ringkasan).
+- Raport **A4** + **watermark di setiap lembar** (bukan cuma halaman pertama).
+
+### ✅ A4 + watermark (globals.css)
+- Kelas baru `.cetak-lembar` (A4: `width:210mm; min-height:297mm; padding:15mm`; layar `max-width:100%`).
+  `@page` kini `margin:0` (lembar sediakan padding sendiri). Page-break antar lembar tetap.
+- Watermark **`.cetak-watermark`** = `position:fixed` (print-only) → **diulang di TIAP halaman** oleh mesin cetak
+  (opacity 0.06). Komponen `cetak-watermark.tsx` dipasang sekali di halaman detail (raport admin), cetak-kelas,
+  cetak-progres, cetak-progres-kelas. Watermark in-article lama di RaportSheet dijadikan **screen-only** (`no-print`).
+- Kop diekstrak → `kop-sekolah.tsx` (dipakai raport & progres). RaportSheet pakai `.cetak-lembar`.
+
+### ✅ Progres Latihan (data + UI)
+- `lib/progres.ts` `ProgresData` + **`totalNum`/`totalLit`** (jumlah pengerjaan num/lit terpisah). (test +2 assert).
+- `server/laporan.ts`: `KET_MODE`, **`muatProgresCetakSiswa`** (identitas+ProgresData), **`muatProgresKelas`**
+  (rekap per siswa satu kelas: totalNum/totalLit/rataNum/rataLit/poin; tarik PracticeActivity ≤400hr sekali,
+  agregat per siswa via `agregatProgres`). `requireStaf` = guru+admin.
+- Halaman detail `[siswaId]`: section **Progres Latihan** (layar) — 4 stat (Numerasi/Literasi pengerjaan +
+  Rata Numerasi/Literasi) + grafik + tombol **🖨️ Cetak Progres** (guru+admin) → halaman cetak.
+- Halaman cetak baru (guru+admin): **`/guru/laporan/cetak-progres`** (`progres-sheet.tsx`: kop + ringkasan
+  kuantitas & mutu + grafik + rincian per periode + ttd) & **`/guru/laporan/cetak-progres-kelas`** (tabel rekap
+  A4 + footer rata/total kelas). Toggle Harian/Mingguan/Bulanan (pakai `BUCKET_NAMA` dari lib/kelas).
+- Daftar `/guru/laporan`: tombol **🖨️ Cetak Progres Sekelas** (guru+admin) + Cetak Raport Sekelas (admin).
+
+### ✅ Verifikasi
+- `tsc` bersih, **npm test 109/109**, `npm run build` sukses (**23 rute**, +2 cetak-progres). Aset watermark
+  `public/logo-sekolah.webp` ada; CSS `.cetak-lembar`/`.cetak-watermark` valid.
+- **Data path DB nyata** (skrip, tanpa requireStaf): rekap X TKJ 1 → 5 siswa, jumlah pengerjaan num/lit terpisah
+  + rata nilai + poin benar (Budi num jml1/rata20, lit jml1/rata100, poin42); individual & 3 mode benar.
+- **⚠️ Visual A4/watermark & cetak saat login staf BELUM di-e2e** (larangan ketik password) — perlu user cek
+  Print Preview (pastikan opsi "Background graphics" aktif agar watermark tercetak).
+
+---
+
+## 2026-07-20 — Hasil diagnostik di raport + lampiran grafik perkembangan + SKIBA "Progres" — TUNTAS
+
+### ✅ Keputusan user
+- **Grafik perkembangan**: garis 0–100, **dua domain** (Numerasi & Literasi); titik pertama = hasil
+  diagnostik (dikonversi 0–100), lalu skor Check Point tiap bulan.
+- **Baseline SKIBA**: **tambah kolom** `diagScore`+`diagAt` (akurat), bukan turunan recLevel.
+- **Peringkat SKIBA**: ganti **tab in-module saja** jadi "Progres"; papan peringkat global
+  `/siswa/peringkat` **tetap ada**.
+
+### ✅ 1) Skema — baseline diagnostik numerasi
+- `SkibaProfile` + `diagScore Int?` (skor % diagnostik 0–100) & `diagAt DateTime?`.
+  Migrasi dev **`20260720103006_skiba_diag_score`** (SQLite). `submitDiagnostik` (server/skiba.ts)
+  kini **upsert** `diagScore = hasil.pct` & `diagAt = now` saat siswa selesai diagnostik.
+- Postgres: `npm run db:pg:sync` + migrasi **`prisma/postgres/migrations/1_skiba_diag_score/`**
+  (ditulis TANGAN — `migrate diff --from-migrations` butuh shadow DB Postgres yang tak ada di laptop;
+  isinya ALTER TABLE 2 kolom nullable, cocok dengan referensi migrasi SQLite). PG schema **valid**.
+
+### ✅ 2) Hasil diagnostik di raport (lib/laporan.ts + server + sheet)
+- Lib murni baru: `agregatDiagNumerasi` (skor + rata recLevel/20), `agregatDiagLiterasi`
+  (rata skor per level + rekomendasi jurusan), `bangunPerkembangan` (titik "Awal" diagnostik → CP/bln).
+  `RaportSiswa` + `diagNum`/`diagLit`/`perkembangan`; `bangunRaport` merangkainya.
+- `server/laporan.ts` `kumpulkanRaport`: tarik `skibaProfile` (diagScore/diagAt) + recLevel per topik
+  + `skibacaDiagnostic` (terbaru per siswa) → agregat → `bangunRaport`.
+- `raport-sheet.tsx`: section **C. Hasil Tes Diagnostik (Asesmen Awal)** (2 kartu Num/Lit) +
+  **D. Lampiran — Grafik Perkembangan** (`perkembangan-chart.tsx`, SVG garis 0–100, warna eksplisit
+  agar tercetak). Catatan digeser ke **E**.
+
+### ✅ 3) SKIBA Math: tab "🏆 Peringkat" → "📊 Progres"
+- `skiba-client.tsx`: mode `peringkat`→`progres`; komponen `Progres` (rekap PRIBADI, bukan kompetisi):
+  4 stat (skor/level dilalui/topik dibuka/topik tuntas) + kartu per topik (Lv, skor, level selesai,
+  **saran diagnostik Lv X**, bar progres). Hint arahkan ke menu Peringkat global.
+- `server/skiba.ts`: `muatPeringkat`/`BarisPeringkat` (papan dari PracticeActivity) **dihapus** —
+  sudah tak dipakai (peringkat global pakai `lib/peringkat.ts`). Import `useMemo` dibuang.
+
+### ✅ Verifikasi
+- `tsc` bersih, **npm test 109/109** (+6: agregatDiag Num/Lit, bangunPerkembangan), `npm run build`
+  sukses (21 rute). PG schema valid.
+- **E2E live siswa (login NISN, Budi)**: tab **Progres** render benar (stat 1/200, 6/10, 0/10, kartu
+  "saran diagnostik Lv X"); jalankan **Tes Diagnostik** 30 soal → skor 7% → **`diagScore=7`+`diagAt`
+  tersimpan** (dicek skrip DB). Pipeline raport thd DB nyata: `perkembangan = [Awal(num 7, lit 40),
+  Jul 2026(num 0, lit 0)]` benar.
+- **Raport visual saat login staf BELUM di-e2e** (larangan ketik password) — perlu user cek cetak.
+  Data & render-compile sudah terbukti (build + pipeline DB).
+
+---
+
 ## 2026-07-20 — Deploy PRODUKSI: PostgreSQL + Docker Compose (app-only) — SIAP (belum diuji live)
 
 ### ✅ Keputusan user

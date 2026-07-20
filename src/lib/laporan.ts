@@ -106,6 +106,79 @@ export function agregatSkibaca(progress: SkibacaProg[], summaries: SkibacaSum[])
   };
 }
 
+/* ── Hasil Tes Diagnostik (asesmen awal) — jadi titik awal grafik perkembangan ── */
+export interface DiagNumerasi {
+  score: number; // skor % diagnostik SKIBA (0..100)
+  levelRata: number; // rata level rekomendasi antar topik (1..20)
+  at: string | null; // ISO waktu tes (untuk info)
+}
+export interface DiagLiterasi {
+  jurusanKode: string;
+  recommended: number; // level saran 1..5
+  rataScore: number; // rata skor % antar level yang diujikan (0..100)
+  at: string | null;
+}
+
+/** Level rekomendasi 1..20 dari skor 0..100 (padanan levelRata di lib/skiba). */
+function levelDariSkor(pct: number): number {
+  const L = Math.round((pct / 100) * 19) + 1;
+  return L < 1 ? 1 : L > 20 ? 20 : L;
+}
+
+export function agregatDiagNumerasi(input: {
+  score: number | null;
+  at: string | null;
+  recLevels: number[];
+}): DiagNumerasi | null {
+  if (input.score == null) return null;
+  const levelRata = input.recLevels.length
+    ? Math.round(input.recLevels.reduce((s, x) => s + x, 0) / input.recLevels.length)
+    : levelDariSkor(input.score);
+  return { score: input.score, levelRata, at: input.at };
+}
+
+export function agregatDiagLiterasi(
+  input: { jurusanKode: string; recommended: number; scores: Record<string, number>; at: string | null } | null,
+): DiagLiterasi | null {
+  if (!input) return null;
+  const vals = Object.values(input.scores).filter((v) => typeof v === "number");
+  const rataScore = vals.length ? Math.round(vals.reduce((s, x) => s + x, 0) / vals.length) : 0;
+  return { jurusanKode: input.jurusanKode, recommended: input.recommended, rataScore, at: input.at };
+}
+
+/* ── Grafik perkembangan: baseline diagnostik → skor Check Point tiap bulan ── */
+export interface TitikPerkembangan {
+  label: string; // "Awal" atau "Bln YYYY"
+  numerasi: number | null; // 0..100 (null = tak ada data pada titik ini)
+  literasi: number | null;
+}
+
+const BULAN_SINGKAT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+function labelBulanSingkat(period: string): string {
+  const [th, bl] = period.split("-");
+  return `${BULAN_SINGKAT[Number(bl) - 1] ?? bl} ${th}`;
+}
+
+/**
+ * Rangkai titik perkembangan: titik pertama "Awal" dari diagnostik (bila ada minimal satu domain),
+ * lalu satu titik per bulan Check Point (skor numerasi & literasi). Semua di skala 0..100.
+ */
+export function bangunPerkembangan(input: {
+  diagNumerasi: number | null;
+  diagLiterasi: number | null;
+  cpRows: CpRow[];
+}): TitikPerkembangan[] {
+  const titik: TitikPerkembangan[] = [];
+  if (input.diagNumerasi != null || input.diagLiterasi != null) {
+    titik.push({ label: "Awal", numerasi: input.diagNumerasi, literasi: input.diagLiterasi });
+  }
+  const cp = [...input.cpRows].sort((a, b) => (a.period < b.period ? -1 : a.period > b.period ? 1 : 0));
+  for (const r of cp) {
+    titik.push({ label: labelBulanSingkat(r.period), numerasi: r.numerasi, literasi: r.literasi });
+  }
+  return titik;
+}
+
 /* ── Raport lengkap satu siswa ── */
 export interface IdentitasSiswa {
   nama: string;
@@ -117,6 +190,9 @@ export interface RaportSiswa extends IdentitasSiswa {
   cp: AgregatCp;
   skiba: AgregatSkiba;
   skibaca: AgregatSkibaca;
+  diagNum: DiagNumerasi | null; // hasil tes diagnostik numerasi (SKIBA)
+  diagLit: DiagLiterasi | null; // hasil tes diagnostik literasi (SKIBACA)
+  perkembangan: TitikPerkembangan[]; // baseline diagnostik → Check Point (untuk lampiran grafik)
   aktivitasNumerasi: number; // jumlah PracticeActivity NUMERASI dalam semester (keaktifan latihan)
   aktivitasLiterasi: number; // jumlah PracticeActivity LITERASI dalam semester
 }
@@ -127,6 +203,8 @@ export function bangunRaport(input: {
   skibaStates: SkibaState[];
   skibacaProgress: SkibacaProg[];
   skibacaSummaries: SkibacaSum[];
+  diagNum: DiagNumerasi | null;
+  diagLit: DiagLiterasi | null;
   aktivitasNumerasi: number;
   aktivitasLiterasi: number;
 }): RaportSiswa {
@@ -135,6 +213,13 @@ export function bangunRaport(input: {
     cp: agregatCheckpoint(input.cpRows),
     skiba: agregatSkiba(input.skibaStates),
     skibaca: agregatSkibaca(input.skibacaProgress, input.skibacaSummaries),
+    diagNum: input.diagNum,
+    diagLit: input.diagLit,
+    perkembangan: bangunPerkembangan({
+      diagNumerasi: input.diagNum?.score ?? null,
+      diagLiterasi: input.diagLit?.rataScore ?? null,
+      cpRows: input.cpRows,
+    }),
     aktivitasNumerasi: input.aktivitasNumerasi,
     aktivitasLiterasi: input.aktivitasLiterasi,
   };

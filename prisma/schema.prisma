@@ -192,11 +192,13 @@ model SkibaTopicState {
 
 // Profil SKIBA per siswa — menampung kuota tes diagnostik (maks 2x, seumur akun).
 model SkibaProfile {
-  id           String   @id @default(cuid())
-  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  studentId    String   @unique
-  diagAttempts Int      @default(0)
-  updatedAt    DateTime @updatedAt
+  id           String    @id @default(cuid())
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String    @unique
+  diagAttempts Int       @default(0)
+  diagScore    Int? // skor % diagnostik terakhir (0..100) — baseline grafik perkembangan
+  diagAt       DateTime? // waktu tes diagnostik terakhir dikerjakan
+  updatedAt    DateTime  @updatedAt
 }
 
 // ── SKIBACA (Phase 3): bacaan literasi per jurusan/level, terpusat di DB ──
