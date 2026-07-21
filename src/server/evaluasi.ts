@@ -44,7 +44,7 @@ async function requireStaf(): Promise<void> {
 export async function muatEvaluasi(params: { kelas?: string; period?: string }): Promise<EvaluasiData> {
   await requireStaf();
 
-  const kelasRows = await prisma.kelas.findMany({ select: { label: true } });
+  const kelasRows = await prisma.kelas.findMany({ where: { aktif: true }, select: { label: true } });
   const kelasOpsi = kelasRows.map((k) => k.label).sort(urutkanKelas);
 
   const students = await prisma.student.findMany({

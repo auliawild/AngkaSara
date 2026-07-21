@@ -38,7 +38,9 @@ model Kelas {
   jurusanId String
   rombel    Int
   label     String    @unique // "XI TKJ 2"
+  aktif     Boolean   @default(true) // kelas yang aktif dikelola; nonaktif disembunyikan dari dropdown/evaluasi/impor
   students  Student[]
+  penilai   User[]    @relation("PenilaiKelas") // admin yang ditugasi menilai ringkasan kelas ini
 
   @@unique([tingkat, jurusanId, rombel])
 }
@@ -79,6 +81,7 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  kelasDinilai  Kelas[]   @relation("PenilaiKelas") // kelas yang boleh dinilai admin ini (kosong = semua kelas)
 
   @@map("user")
 }

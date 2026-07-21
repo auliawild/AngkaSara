@@ -20,7 +20,7 @@ export default async function KelolaSiswaPage({
   if (role !== "ADMIN") redirect("/guru");
 
   const kelasList = await prisma.kelas.findMany({
-    select: { id: true, label: true, _count: { select: { students: true } } },
+    select: { id: true, label: true, aktif: true, _count: { select: { students: true } } },
   });
   kelasList.sort((a, b) => urutkanKelas(a.label, b.label));
   const totalSiswa = kelasList.reduce((s, k) => s + k._count.students, 0);
@@ -76,6 +76,11 @@ export default async function KelolaSiswaPage({
                 <span className="truncate">
                   <span className="mr-1">{ikonJurusan(k.label)}</span>
                   {k.label}
+                  {!k.aktif && (
+                    <span className={"ml-1.5 text-[10px] font-semibold " + (aktif ? "text-white/70" : "text-amber-600 dark:text-amber-400")}>
+                      nonaktif
+                    </span>
+                  )}
                 </span>
                 <span
                   className={

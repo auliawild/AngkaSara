@@ -3,13 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { tambahAdmin } from "@/server/staf";
+import PilihKelas, { type OpsiKelas } from "./pilih-kelas";
 
-export default function TambahAdmin() {
+export default function TambahAdmin({ kelasOpsi }: { kelasOpsi: OpsiKelas[] }) {
   const router = useRouter();
   const [buka, setBuka] = useState(false);
   const [nama, setNama] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [kelasIds, setKelasIds] = useState<string[]>([]);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -18,12 +20,13 @@ export default function TambahAdmin() {
     setError(null);
     setOk(null);
     start(async () => {
-      const res = await tambahAdmin({ nama, email, password });
+      const res = await tambahAdmin({ nama, email, password, kelasIds });
       if (res.ok) {
         setOk(`Admin ${nama} dibuat.`);
         setNama("");
         setEmail("");
         setPassword("");
+        setKelasIds([]);
         setBuka(false);
         router.refresh();
       } else setError(res.error ?? "Gagal membuat admin.");
@@ -55,11 +58,28 @@ export default function TambahAdmin() {
       </div>
 
       {buka && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <input className={inp} placeholder="Nama lengkap" value={nama} onChange={(e) => setNama(e.target.value)} autoComplete="off" />
-          <input className={inp} type="email" placeholder="email@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
-          <input className={inp} type="password" placeholder="Kata sandi (min. 8)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-          <div className="sm:col-span-3">
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <input className={inp} placeholder="Nama lengkap" value={nama} onChange={(e) => setNama(e.target.value)} autoComplete="off" />
+            <input className={inp} type="email" placeholder="email@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
+            <input className={inp} type="password" placeholder="Kata sandi (min. 8)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          </div>
+
+          <div className="rounded-lg border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold">Kelas yang boleh dinilai</span>
+              <span className="text-[11px] text-zinc-500">
+                {kelasIds.length === 0 ? "Kosong = semua kelas" : `${kelasIds.length} kelas dipilih`}
+              </span>
+            </div>
+            <p className="mb-3 text-[11.5px] leading-snug text-zinc-500">
+              Batasi admin ini agar hanya bisa <b>Menilai Ringkasan SKIBACA</b> untuk kelas terpilih.
+              Biarkan kosong bila admin boleh menilai semua kelas.
+            </p>
+            <PilihKelas opsi={kelasOpsi} nilai={kelasIds} onChange={setKelasIds} />
+          </div>
+
+          <div>
             <button
               onClick={simpan}
               disabled={pending || !nama || !email || password.length < 8}

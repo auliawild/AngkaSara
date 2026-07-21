@@ -34,12 +34,21 @@ export interface AksiResult {
   error?: string;
 }
 
-/** Tambah satu akun ADMIN (login pakai email + password). Terpisah dari impor guru (yang selalu GURU). */
-export async function tambahAdmin(input: { nama: string; email: string; password: string }): Promise<AksiResult> {
+/**
+ * Tambah satu akun ADMIN (login pakai email + password). Terpisah dari impor guru (yang selalu GURU).
+ * `kelasIds` opsional = kelas yang boleh dinilai admin ini (Nilai Ringkasan). Kosong = akses semua kelas.
+ */
+export async function tambahAdmin(input: {
+  nama: string;
+  email: string;
+  password: string;
+  kelasIds?: string[];
+}): Promise<AksiResult> {
   await requireAdmin();
   const nama = input.nama.trim().replace(/\s+/g, " ");
   const email = input.email.trim().toLowerCase();
   const password = input.password ?? "";
+  const kelasIds = [...new Set(input.kelasIds ?? [])];
   if (!nama) return { ok: false, error: "Nama wajib diisi." };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Email tidak valid." };
   if (password.length < 8) return { ok: false, error: "Kata sandi minimal 8 karakter." };
@@ -50,7 +59,16 @@ export async function tambahAdmin(input: { nama: string; email: string; password
   const id = randomUUID();
   await prisma.$transaction([
     prisma.user.create({
-      data: { id, name: nama, email, emailVerified: true, role: "ADMIN", createdAt: now, updatedAt: now },
+      data: {
+        id,
+        name: nama,
+        email,
+        emailVerified: true,
+        role: "ADMIN",
+        createdAt: now,
+        updatedAt: now,
+        ...(kelasIds.length ? { kelasDinilai: { connect: kelasIds.map((k) => ({ id: k })) } } : {}),
+      },
     }),
     prisma.account.create({
       data: {
@@ -133,6 +151,30 @@ export async function hapusStaf(userId: string): Promise<AksiResult> {
     if (jml <= 1) return { ok: false, error: "Minimal harus ada 1 admin." };
   }
   await prisma.user.delete({ where: { id: userId } });
+  revalidatePath("/guru/staf");
+  return { ok: true };
+}
+
+/**
+ * Setel kelas yang boleh dinilai (Nilai Ringkasan) untuk satu staf. Kosong = akses semua kelas.
+ * Menggantikan seluruh daftar (bukan menambah). Hanya ADMIN.
+ */
+export async function setKelasDinilai(userId: string, kelasIds: string[]): Promise<AksiResult> {
+  await requireAdmin();
+  const ids = [...new Set(kelasIds ?? [])];
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!u) return { ok: false, error: "Akun tidak ditemukan." };
+
+  // Validasi id kelas benar-benar ada (hindari connect id sampah).
+  if (ids.length) {
+    const ada = await prisma.kelas.count({ where: { id: { in: ids } } });
+    if (ada !== ids.length) return { ok: false, error: "Sebagian kelas tidak valid." };
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { kelasDinilai: { set: ids.map((k) => ({ id: k })) } },
+  });
   revalidatePath("/guru/staf");
   return { ok: true };
 }

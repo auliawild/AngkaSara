@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { urutkanKelas } from "@/lib/kelas";
 import ImporStafPanel from "./impor-staf-panel";
 import TambahAdmin from "./tambah-admin";
 import StafTabel from "./staf-tabel";
@@ -17,9 +18,12 @@ export default async function KelolaStafPage() {
 
   const users = await prisma.user.findMany({
     orderBy: [{ role: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, nip: true, role: true },
+    select: { id: true, name: true, nip: true, role: true, kelasDinilai: { select: { id: true } } },
   });
   const jumlahGuru = users.filter((u) => u.role !== "ADMIN").length;
+
+  const kelasRows = await prisma.kelas.findMany({ select: { id: true, label: true, tingkat: true } });
+  const kelasOpsi = kelasRows.sort((a, b) => urutkanKelas(a.label, b.label));
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10">
@@ -37,9 +41,18 @@ export default async function KelolaStafPage() {
 
       <ImporStafPanel />
 
-      <TambahAdmin />
+      <TambahAdmin kelasOpsi={kelasOpsi} />
 
-      <StafTabel data={users.map((u) => ({ id: u.id, nama: u.name, nip: u.nip, role: u.role }))} />
+      <StafTabel
+        kelasOpsi={kelasOpsi}
+        data={users.map((u) => ({
+          id: u.id,
+          nama: u.name,
+          nip: u.nip,
+          role: u.role,
+          kelasIds: u.kelasDinilai.map((k) => k.id),
+        }))}
+      />
     </main>
   );
 }

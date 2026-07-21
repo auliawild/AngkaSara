@@ -9,9 +9,20 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
-async function requireStaf(): Promise<void> {
+/**
+ * Lingkup kelas yang boleh dinilai staf yang sedang login.
+ * `dibatasi=false` (tak ada penugasan) = akses SEMUA kelas (perilaku lama, admin utama & guru).
+ * `dibatasi=true` = hanya `labels` (admin yang ditugasi kelas tertentu).
+ */
+async function lingkupKelas(): Promise<{ dibatasi: boolean; labels: string[] }> {
   const s = await auth.api.getSession({ headers: await headers() });
   if (!s) throw new Error("Sesi staf tidak ditemukan.");
+  const u = await prisma.user.findUnique({
+    where: { id: s.user.id },
+    select: { kelasDinilai: { select: { label: true } } },
+  });
+  const labels = (u?.kelasDinilai ?? []).map((k) => k.label);
+  return { dibatasi: labels.length > 0, labels };
 }
 
 export interface RingkasanUntukGuru {
@@ -34,9 +45,12 @@ export interface RingkasanUntukGuru {
 
 /** Daftar ringkasan terkirim. `filter`: "belum" (default) hanya yang belum dinilai; "semua" semua. */
 export async function muatRingkasanUntukGuru(filter: "belum" | "semua" = "belum"): Promise<RingkasanUntukGuru[]> {
-  await requireStaf();
+  const { dibatasi, labels } = await lingkupKelas();
   const rows = await prisma.skibacaSummary.findMany({
-    where: filter === "belum" ? { gradedAt: null } : {},
+    where: {
+      ...(filter === "belum" ? { gradedAt: null } : {}),
+      ...(dibatasi ? { student: { kelas: { label: { in: labels } } } } : {}),
+    },
     orderBy: [{ gradedAt: "asc" }, { createdAt: "asc" }], // belum dinilai (null) dulu
     include: {
       student: { select: { nama: true, kelas: { select: { label: true } } } },
@@ -88,13 +102,19 @@ export async function nilaiRingkasan(input: {
   score: number;
   feedback?: string;
 }): Promise<NilaiRingkasanHasil> {
-  await requireStaf();
+  const { dibatasi, labels } = await lingkupKelas();
   const skor = Math.round(Number(input.score));
   if (!Number.isFinite(skor) || skor < 0 || skor > 100) {
     return { ok: false, error: "Skor harus 0–100." };
   }
-  const ada = await prisma.skibacaSummary.findUnique({ where: { id: input.summaryId }, select: { id: true } });
+  const ada = await prisma.skibacaSummary.findUnique({
+    where: { id: input.summaryId },
+    select: { id: true, student: { select: { kelas: { select: { label: true } } } } },
+  });
   if (!ada) return { ok: false, error: "Ringkasan tidak ditemukan." };
+  if (dibatasi && !labels.includes(ada.student.kelas.label)) {
+    return { ok: false, error: "Anda tidak ditugasi menilai kelas ini." };
+  }
 
   await prisma.skibacaSummary.update({
     where: { id: input.summaryId },

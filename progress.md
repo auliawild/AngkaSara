@@ -10,6 +10,190 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-21 — Simulasi Modul untuk guru (sandbox, tanpa simpan) — TUNTAS
+
+### ✅ Permintaan user
+- Guru bisa **mencoba** modul mirip SKIBA Math & SKIBACA (kapasitas ujicoba), **papan skor tersimpan
+  dalam simulasi**, cukup **tes diagnostik + sampling level** biar tak banyak dibuat. Hasil TIDAK boleh
+  masuk peringkat siswa.
+
+### ✅ Keputusan desain
+- **Generator tetap di server** (keamanan): kalau generator numerasi dibundel ke klien, siswa bisa
+  menurunkan kunci Check Point/SKIBA (seed ada di JWT). Jadi soal tetap DIBANGKITKAN & DINILAI di server
+  (sesi staf), **tanpa menulis DB sama sekali**. Papan skor disimpan di **localStorage** ("dalam simulasi").
+- Isolasi peringkat bersifat **struktural**: semua data siswa ber-kunci `studentId`; simulasi guru tak
+  membuat baris apa pun → mustahil masuk peringkat (bukan sekadar disaring).
+
+### ✅ Implementasi
+- **`server/simulasi.ts`** (sesi staf, ZERO write — hanya `findMany/findUnique` read-only): SKIBA Math
+  `simMulaiDiagnostik`/`simNilaiDiagnostik` (30 soal) & `simMulaiArena`/`simNilaiArena` (10 soal, semua
+  level terbuka, token ber-seed spt alur asli) memakai ulang `buildDiagnostik/nilaiDiagnostik/buildArena/
+  nilaiArena`. SKIBACA `simContohBacaan` (ambil 4 bacaan kuis contoh) & `simNilaiBacaan` (nilai vs
+  answerIndex) memakai ulang `persenSkor/badgeSkibaca`.
+- **`app/guru/simulasi/page.tsx`** + **`simulasi-client.tsx`**: dua tab (Math/SKIBACA), runner soal
+  berurutan utk math, baca+kuis utk literasi, **Papan Skor Simulasi (localStorage)** dgn terbaik per jenis
+  + riwayat + tombol kosongkan. Banner "hasil tak disimpan & tak masuk peringkat".
+- Kartu "🧪 Simulasi Modul" di dasbor guru (semua staf, bukan admin-only).
+
+### ✅ Verifikasi
+- `tsc` bersih, `eslint` bersih (satu `eslint-disable` sah: load localStorage di effect utk hindari
+  hydration mismatch).
+- E2E login **GURU** (non-admin) → `/guru/simulasi` tampil (banner, 2 tab, kontrol, papan skor). Arena
+  10 soal dijalankan penuh via skrip → `simNilaiArena` menilai (30%, 42 poin, ⭐) → tercatat ke papan
+  localStorage & **persist** lintas navigasi. SKIBACA memuat 4 bacaan contoh dari DB + soal tampil.
+- **Isolasi terbukti**: `simulasi.ts` tanpa write (grep), & `PracticeActivity`/`SkibaTopicState` tetap
+  2/10 (tak bertambah) setelah guru main → nol dampak ke peringkat.
+- Catatan: interaksi via MCP browser sempat mis-klik & memicu navigasi tak sengaja yang menonaktifkan
+  22 kelas (Kelola Kelas optimistik); **sudah dipulihkan ke 46 aktif** via DB.
+
+---
+
+## 2026-07-21 — Lingkup penilai: admin dibatasi kelas utk Nilai Ringkasan — TUNTAS
+
+### ✅ Permintaan user
+- Peringkat tetap lihat keseluruhan (TIDAK diubah).
+- Admin tambahan yang baru ditambahkan **hanya bisa menilai Ringkasan SKIBACA untuk kelas yang
+  ditetapkan** untuknya (kelas yang bisa dibuka admin tsb).
+
+### ✅ Implementasi
+- **Schema + migrasi** `20260721062427_kelas_penilai`: relasi m2m implisit `User.kelasDinilai ↔
+  Kelas.penilai` (`@relation("PenilaiKelas")`, tabel `_PenilaiKelas`). **Semantik: kosong = akses SEMUA
+  kelas** (admin utama & guru lama tak berubah); ≥1 kelas = DIBATASI ke kelas itu.
+- **`server/staf.ts`**: `tambahAdmin` terima `kelasIds?` → connect saat buat admin. Aksi baru
+  `setKelasDinilai(userId, kelasIds)` (ADMIN, validasi id kelas, `set` menggantikan daftar).
+- **`server/skibaca-guru.ts`**: helper `lingkupKelas()` (baca `kelasDinilai` user sesi). `muatRingkasanUntukGuru`
+  memfilter `where.student.kelas.label IN labels` bila dibatasi; `nilaiRingkasan` menolak
+  ("Anda tidak ditugasi menilai kelas ini") bila summary di luar lingkup. `requireStaf` lama dibuang (tak dipakai).
+- **UI**: komponen `pilih-kelas.tsx` (checkbox per tingkat, terkontrol, reusable). `tambah-admin.tsx`
+  kini punya pemilih kelas ("kosong = semua"). `staf-tabel.tsx` + kolom "Kelas dinilai" + editor
+  inline "🏫 Atur kelas" per staf → `setKelasDinilai`. `staf/page.tsx` memuat kelasOpsi + kelasDinilai per user.
+- **Cakupan sengaja**: hanya **Nilai Ringkasan SKIBACA**. Evaluasi/Laporan/Siswa/Peringkat tetap lihat semua
+  (sesuai permintaan; Peringkat eksplisit tak diubah).
+
+### ✅ Verifikasi
+- `tsc` bersih, `eslint` bersih (7 file). (Tak ada logika murni baru → tak ada tes Vitest baru.)
+- E2E: 1 ringkasan (sudah dinilai) ada di **X TKJ 1**. (1) Admin tanpa penugasan → tab "Semua" tampil
+  **1 ringkasan**. (2) Tugaskan Administrator ke **X TKR 1** via editor staf (tersimpan ke `_PenilaiKelas`)
+  → "Semua" jadi **0** (X TKJ 1 tersembunyi). (3) Kosongkan penugasan → **1** lagi. **State dikembalikan**
+  (tanpa penugasan; admin utama akses penuh).
+- Catatan: jalur *buat admin baru* (`tambahAdmin` + kelasIds) tidak di-e2e demi mematuhi larangan
+  "membuat akun"; namun memakai relasi & mekanisme connect yang identik dgn `setKelasDinilai` yang sudah
+  terbukti + tervalidasi `tsc`.
+
+---
+
+## 2026-07-21 — Kelola Kelas: aktif/nonaktifkan kelas (ADMIN) — TUNTAS
+
+### ✅ Permintaan user
+- Tambahkan fitur admin untuk mengelola kelas, dengan pilihan kelas yang bisa dikelola.
+- Pilihan user (via tanya): **aktif/nonaktifkan kelas** (bukan CRUD), **hanya ADMIN**. Kelas nonaktif
+  disembunyikan dari dropdown, evaluasi, & impor.
+
+### ✅ Implementasi
+- **Schema + migrasi** `20260721053807_kelas_aktif`: kolom `Kelas.aktif Boolean @default(true)`
+  (semua 46 kelas lama → aktif). `npm run db:pg:sync` menyelaraskan schema Postgres (prod).
+- **`server/kelas.ts`** (ADMIN-only): `muatKelolaKelas()` (daftar kelas + jumlah siswa + status,
+  urut, plus `totalSiswaNonaktif` utk peringatan), `setKelasAktif(id, aktif)`, `setTingkatAktif(tingkat, aktif)`
+  (tombol pintas per-tingkat). Semua revalidate /guru, /guru/kelas, /guru/evaluasi, /guru/laporan, /guru/siswa.
+- **Halaman `/guru/kelas`** (server, ADMIN-guard) + **`kelas-client.tsx`** (client, optimistik):
+  dikelompokkan per Tingkat (X/XI/XII), tiap kelas punya switch toggle + jumlah siswa, header per-tingkat
+  "N/M aktif" + tombol Aktifkan/Nonaktifkan semua. Banner peringatan bila ada siswa di kelas nonaktif.
+- **Integrasi filter aktif**: dropdown Evaluasi (`server/evaluasi.ts`) & Laporan (`server/laporan.ts`)
+  → `where:{aktif:true}`. Impor siswa (`server/students.ts` peta kelas hanya aktif) + guard baru di
+  **`lib/impor.ts`** (`hitungImpor`): label sah tapi tak ada di peta aktif → gagal "Kelas nonaktif".
+  Dasbor "Kelas Aktif" (`server/dashboard.ts`) kini `count(kelas aktif)`. Kelola Siswa menandai kelas nonaktif.
+- **Entri baru**: kartu "🏫 Kelola Kelas" di menu dasbor (ADMIN) + baris di tab Profil (ADMIN).
+
+### ✅ Verifikasi
+- `tsc` bersih, `eslint` bersih, **Vitest 8/8** (impor.test + kasus baru "kelas nonaktif ditolak").
+- E2E ADMIN: `/guru/kelas` render 46 kelas per tingkat + toggle. Nonaktifkan **X TKJ 2** → header jadi
+  15/16, DB `aktif=0` (persist), total aktif 45. Cek dropdown **Evaluasi** via JS: 45 kelas, **X TKJ 2
+  hilang**, X TKJ 1 tetap. Dasbor: kartu "Kelola Kelas" muncul, stat "Kelas Aktif"=46. **State DB
+  dikembalikan** (X TKJ 2 aktif lagi → 46/46).
+- ⚠️ Gotcha dicatat di buglog **PRISMA7-02**: `migrate dev` tak regen client → runtime
+  `PrismaClientValidationError` walau `tsc` lolos; perlu `rm -rf src/generated/prisma && prisma generate`.
+
+---
+
+## 2026-07-21 — Ubah Sandi sendiri (self-service, admin/staf) — TUNTAS
+
+### ✅ Permintaan user
+- Tambahkan agar admin bisa mengedit/ubah kata sandinya sendiri (fitur "Ubah Sandi" yang ada di
+  desain Profil tapi belum diimplementasi).
+
+### ✅ Implementasi
+- **`server/staf-auth.ts` → `ubahSandiSendiri({sandiLama, sandiBaru})`** — server action; verifikasi sesi
+  (`auth.api.getSession`), lalu **`auth.api.changePassword`** (verifikasi sandi lama & rehash scrypt,
+  `revokeOtherSessions:true` → perangkat lain keluar, sesi kini tetap). Validasi: baru ≥8 char, baru≠lama;
+  sandi lama salah → "Kata sandi lama salah." Berlaku utk semua staf yg login (admin & guru).
+- **`app/guru/profil/ubah-sandi.tsx`** (client) — baris "🔑 Ubah Sandi" pada Profil yang mengembang jadi
+  form 3 field (lama / baru / ulangi) + tombol, pakai `useTransition`, umpan-balik ok/error. Konfirmasi
+  cocok & panjang divalidasi di klien juga. Dipasang di `app/guru/profil/page.tsx` (sebelum baris Keluar).
+
+### ✅ Verifikasi
+- `tsc --noEmit` bersih (mengonfirmasi `auth.api.changePassword` ada & tipenya cocok), `eslint` bersih.
+- E2E login ADMIN → `/guru/profil`: baris Ubah Sandi mengembang. **Sukses path diuji penuh & dikembalikan**:
+  ubah `admin-angkasara-2026`→`AngkaSara-Baru-2026` (log server 200 + "✓ Kata sandi berhasil diubah"),
+  lalu balik lagi ke default (sandi baru diterima sbg "lama" → bukti perubahan benar-benar tersimpan).
+  Sandi admin **kembali ke default semula**.
+- Catatan UX: di layar HP, saat form Ubah Sandi mengembang, tombol Simpan berada di bawah tab bar
+  (perlu scroll sedikit) — perilaku mobile normal, tak menghalangi; bisa dipoles nanti bila perlu.
+
+---
+
+## 2026-07-21 — Tab bar bawah siswa (konsistensikan mobile dgn guru) — TUNTAS
+
+### ✅ Permintaan user
+- Sesuaikan tampilan **siswa & guru** biar mobile-friendly & konsisten. (Guru sudah punya tab bar +
+  dasbor; sub-halaman guru/siswa sudah responsif — mis. `peringkat/tabel.tsx` beralih ke kartu di bawah
+  `sm`. Gap nyata: **siswa belum punya tab bar bawah** seperti guru.)
+
+### ✅ Implementasi
+- **`app/siswa/bottom-tabs.tsx`** (client) + **`app/siswa/layout.tsx`** — cermin pola guru: bar full-width
+  `inset-x-0`, klaster ikon `max-w-lg mx-auto` (tercenter), highlight aktif via `usePathname`, tampil di
+  semua ukuran. Tab: Beranda / SKIBA / SKIBACA / Check Point / Peringkat. Layout beri `pb-20`.
+- **Disembunyikan di rute imersif** — regex `/^\/siswa\/(checkpoint|skiba)/` menutup Check Point (ujian
+  berwaktu — jangan permudah keluar) & arena SKIBA/SKIBACA (kanvas `position:fixed` z-60). Jadi bar =
+  peluncur di halaman jelajah (Beranda, Peringkat), tak mengganggu aktivitas. Analog dgn guru yg
+  sembunyi di `/cetak`.
+
+### ✅ Verifikasi
+- `tsc --noEmit` bersih, `eslint` bersih (2 file).
+- E2E login siswa (NISN 0071230101, Ahmad Fauzi/X TKJ 1): `/siswa` → tab bar tampil, Beranda aktif
+  (violet). `/siswa/skiba` (arena) → **bar tersembunyi benar** (daftar topik sampai bawah tanpa nav).
+
+---
+
+## 2026-07-21 — Dasbor Guru mobile-friendly (impor desain claude.ai/design) — TUNTAS
+
+### ✅ Permintaan user
+- Impor & implementasi desain **"Dashboard Guru.dc.html"** (proyek `claude.ai/design`, mobile-friendly)
+  ke halaman dasbor guru.
+
+### ✅ Implementasi
+- **`server/dashboard.ts`** baru — `muatRingkasanSekolah()`: angka NYATA dari DB (totalSiswa aktif,
+  kelasAktif = kelas berisi siswa, guruStaf = `user.count`, cpPersen = % siswa mengerjakan Check Point
+  periode berjalan via `distinct` studentId, kelasBelumTuntas). Guarded sesi staf.
+- **`app/guru/page.tsx`** ditulis ulang jadi layar "Beranda": kartu sapaan gradien (salam menurut waktu,
+  tanpa honorifik gender), **Ringkasan Sekolah** (4 kartu statistik nyata, %CP diberi warna klasifikasi
+  ≥75/≥60/else), **Menu Pengelolaan** (6 kartu modul gradien; siswa/staf tetap ADMIN-only), kartu tip
+  (jumlah kelas belum tuntas). Pakai keyframes app (`as-pop/as-float/as-lift`), dukungan dark mode.
+- **`app/guru/bottom-tabs.tsx`** (client) + **`app/guru/layout.tsx`** — tab bar bawah, tampil di **semua
+  ukuran** (mobile & desktop, biar konsisten — bukan `md:hidden`): bar full-width `inset-x-0`, klaster
+  ikon `max-w-lg mx-auto` sehingga tercenter sejajar kolom konten (max-w-xl). Highlight aktif via
+  `usePathname`, disembunyikan di rute `/cetak`. Layout beri `pb-20` (semua ukuran).
+- **`app/guru/profil/page.tsx`** baru — tab Profil: header gradien (nama/role/email), baris Instansi +
+  pintasan kelola (ADMIN) + Evaluasi + baris Keluar (pakai `KeluarStaf`).
+
+### ✅ Verifikasi
+- `tsc --noEmit` bersih, `eslint` bersih (5 file).
+- E2E login ADMIN → `/guru`: dasbor render benar dgn data nyata (9 siswa, 2 kelas, 11% merah, 6 staf,
+  tip "2 kelas belum tuntas"); 6 kartu modul gradien tampil. `/guru/profil` render + tab Profil aktif
+  (violet). Tanpa error konsol. (Catatan: disk D: lambat → kompilasi Turbopack per-rute ~3–6 mnt,
+  bukan bug; application-code ~10–35s.)
+
+---
+
 ## 2026-07-21 — Cetak Progres Latihan Sekelas per bulan (pemilih bulan) — TUNTAS
 
 ### ✅ Permintaan user

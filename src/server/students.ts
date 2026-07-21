@@ -31,7 +31,8 @@ export async function imporSiswa(formData: FormData): Promise<ImporLaporan> {
   const baris = await parseSiswa(await file.arrayBuffer(), file.name);
   if (baris.length === 0) throw new Error("Berkas tidak berisi data siswa.");
 
-  const kelasRows = await prisma.kelas.findMany({ select: { id: true, label: true } });
+  // Hanya kelas AKTIF yang boleh menerima impor (kelas nonaktif ditolak, lihat hitungImpor).
+  const kelasRows = await prisma.kelas.findMany({ where: { aktif: true }, select: { id: true, label: true } });
   const kelasByLabel = new Map(kelasRows.map((k) => [k.label, k.id]));
   const existing = new Set(
     (await prisma.student.findMany({ select: { nisn: true } })).map((s) => s.nisn),

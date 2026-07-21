@@ -37,3 +37,31 @@ export async function masukStaf(idRaw: string, password: string): Promise<MasukS
   }
   return { ok: true };
 }
+
+/**
+ * Ubah kata sandi sendiri (self-service, semua staf yang sudah masuk — termasuk admin).
+ * Better Auth `changePassword` memverifikasi sandi lama & me-rehash yang baru (scrypt).
+ * Sesi saat ini tetap valid; sesi perangkat lain dicabut demi keamanan.
+ */
+export async function ubahSandiSendiri(input: {
+  sandiLama: string;
+  sandiBaru: string;
+}): Promise<MasukStafResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Sesi tidak ditemukan. Silakan masuk kembali." };
+
+  const lama = input.sandiLama ?? "";
+  const baru = input.sandiBaru ?? "";
+  if (baru.length < 8) return { ok: false, error: "Kata sandi baru minimal 8 karakter." };
+  if (baru === lama) return { ok: false, error: "Kata sandi baru harus berbeda dari yang lama." };
+
+  try {
+    await auth.api.changePassword({
+      body: { currentPassword: lama, newPassword: baru, revokeOtherSessions: true },
+      headers: await headers(),
+    });
+  } catch {
+    return { ok: false, error: "Kata sandi lama salah." };
+  }
+  return { ok: true };
+}

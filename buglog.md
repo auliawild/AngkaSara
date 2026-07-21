@@ -5,6 +5,21 @@
 
 ---
 
+## PRISMA7-02 — `prisma migrate dev` tak me-regenerate client → runtime `PrismaClientValidationError` untuk field baru
+- **Gejala:** setelah menambah kolom `aktif` ke model `Kelas` lalu `npx prisma migrate dev` (sukses,
+  DB dapat kolomnya), buka `/guru/kelas` → overlay **Runtime PrismaClientValidationError**: `Invalid
+  prisma.kelas.findMany() invocation ... select: { aktif: true }`. Anehnya **`tsc --noEmit` lolos**
+  (tipe generated seakan punya `aktif`), tapi runtime menolak.
+- **Sebab:** client di `src/generated/prisma` **tidak ter-regenerate** oleh `migrate dev` — `inlineSchema`
+  yang ditempel di `internal/class.ts` (dipakai validasi runtime) masih skema LAMA tanpa `aktif`.
+  `npx prisma generate` biasa pun **no-op** (cache) — kemungkinan karena run pertama sempat ke-SIGTERM
+  (disk lambat) meninggalkan state cache. Restart dev server saja tak menolong (file client memang stale).
+- **Solusi:** regenerate BERSIH — `rm -rf src/generated/prisma && npx prisma generate` (generasi asli
+  cuma ~1,3 dtk; sisanya startup CLI di disk lambat), lalu restart dev server. Verifikasi cepat: cek
+  `model Kelas` di dalam `inlineSchema` (`internal/class.ts`) memuat `aktif`. Jangan percaya `tsc` saja
+  untuk perubahan schema — ia bisa lolos walau client runtime basi.
+- **Status:** ✅ teratasi (terverifikasi: /guru/kelas render, toggle persist, kelas nonaktif hilang dari dropdown Evaluasi).
+
 ## HYD-01 — Hydration mismatch pada `<title>` di dalam SVG (grafik progres)
 - **Gejala:** badge merah **"1 Issue"** di pojok kiri-bawah `/guru/laporan/‹siswaId›`; terminal dev
   mencetak `hydration-mismatch` menunjuk `progres-chart.tsx:53` pada elemen `<title>`.

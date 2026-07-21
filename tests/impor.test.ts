@@ -106,4 +106,20 @@ describe("hitungImpor — validasi, normalisasi kelas, dedup", () => {
     expect(toAdd.length).toBe(1);
     expect(laporan.dilewati.length).toBe(2);
   });
+
+  it("menolak kelas yang formatnya sah tapi NONAKTIF (tak ada di peta kelas aktif)", () => {
+    const aktif = new Map(KELAS_SAH);
+    aktif.delete("X TKJ 1"); // anggap "X TKJ 1" dinonaktifkan admin
+    const { toAdd, laporan } = hitungImpor(
+      baris([
+        ["0011112222", "Ani Nonaktif", "x tkj 1"], // gagal: kelas nonaktif (label dinormalkan dulu)
+        ["0022223333", "Budi Aktif", "X TKR 1"], // sah
+      ]),
+      aktif,
+      new Set(),
+    );
+    expect(toAdd.length).toBe(1);
+    expect(toAdd[0].nama).toBe("Budi Aktif");
+    expect(laporan.gagal.map((g) => g.sebab)).toContain("Kelas nonaktif");
+  });
 });

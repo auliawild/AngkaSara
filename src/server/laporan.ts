@@ -49,7 +49,7 @@ async function opsiSemester(): Promise<Semester[]> {
 
 export async function muatOpsiLaporan(): Promise<OpsiLaporan> {
   await requireStaf();
-  const kelasRows = await prisma.kelas.findMany({ select: { label: true } });
+  const kelasRows = await prisma.kelas.findMany({ where: { aktif: true }, select: { label: true } });
   const sems = await opsiSemester();
   return {
     kelasOpsi: kelasRows.map((k) => k.label).sort(urutkanKelas),

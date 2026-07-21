@@ -49,6 +49,11 @@ export function hitungImpor(
       laporan.gagal.push({ baris: b.baris, isi: `${nama} — "${b.kelas}"`, sebab: "Kelas tidak dikenali" });
       continue;
     }
+    // `kelasByLabel` hanya berisi kelas AKTIF. Label sah tapi tak ada di map = kelas nonaktif.
+    if (!kelasByLabel.has(kelas)) {
+      laporan.gagal.push({ baris: b.baris, isi: `${nama} — "${kelas}"`, sebab: "Kelas nonaktif" });
+      continue;
+    }
     if (existing.has(nisn) || seen.has(nisn)) {
       laporan.dilewati.push({ baris: b.baris, nisn, sebab: "NISN sudah terdaftar" });
       continue;
