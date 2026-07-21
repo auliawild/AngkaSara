@@ -80,14 +80,30 @@ npx prisma migrate dev --name <nama>
 npm run db:pg:sync
 
 # 3) Buat migrasi Postgres baru (offline, tanpa DB) ke folder migrasi berikutnya
+#    Bandingkan schema LAMA (dari git, sebelum perubahan) dengan schema BARU.
+git show <commit-sebelum-ubah>:prisma/postgres/schema.prisma > /tmp/pg-old.prisma
+mkdir -p prisma/postgres/migrations/<n>_<nama>
 npx prisma migrate diff \
-  --from-migrations prisma/postgres/migrations \
+  --from-schema /tmp/pg-old.prisma \
   --to-schema prisma/postgres/schema.prisma \
-  --script > prisma/postgres/migrations/<nnnn>_<nama>/migration.sql
-#    (buat foldernya lebih dulu; penomoran urut setelah 0_init)
+  --script --output prisma/postgres/migrations/<n>_<nama>/migration.sql
+#    (penomoran urut setelah 0_init)
 
-# 4) Commit kedua set migrasi. `docker compose up -d --build` menerapkannya di produksi.
+# 4) Verifikasi offline: hasil `--from-empty --to-schema` harus memuat objek yang sama
+npx prisma migrate diff --from-empty --to-schema prisma/postgres/schema.prisma --script | less
+
+# 5) Commit kedua set migrasi. `docker compose up -d --build` menerapkannya di produksi.
 ```
+
+> ⚠️ **Jangan pakai `--from-migrations`** di laptop dev: opsi itu butuh **shadow database
+> Postgres** yang tidak tersedia di sini, dan akan gagal. Diff **dua file schema**
+> (`--from-schema` → `--to-schema`) murni offline dan itulah cara yang dipakai untuk
+> migrasi `2_kelas_aktif` & `3_kelas_penilai`.
+>
+> ⚠️ **Jangan menyalin SQL migrasi dev (SQLite) ke folder Postgres** — bentuknya berbeda.
+> Contoh nyata: relasi m2m implisit `_PenilaiKelas` memakai **`UNIQUE INDEX _AB_unique`**
+> di SQLite tapi **`PRIMARY KEY _AB_pkey`** di Postgres; menambah kolom di SQLite
+> menulis ulang seluruh tabel, di Postgres cukup `ALTER TABLE … ADD COLUMN`.
 
 `prisma/postgres/schema.prisma` **dihasilkan** dari `prisma/schema.prisma` — jangan
 edit manual (jalankan `npm run db:pg:sync`).
@@ -96,6 +112,9 @@ edit manual (jalankan `npm run db:pg:sync`).
 
 - **Verifikasi live belum dilakukan di mesin dev** (laptop ~4 GB RAM, tanpa Docker/Postgres).
   Build & boot compose perlu diuji sekali di server. Yang sudah diverifikasi offline:
-  schema Postgres valid, SQL migrasi ter-generate (18 tabel), dev SQLite utuh (tsc + 103 tes).
+  schema Postgres valid, SQL migrasi ter-generate (18 tabel), dev SQLite utuh (tsc + 117 tes).
+- **Migrasi Postgres yang ada:** `0_init`, `1_skiba_diag_score`, `2_kelas_aktif`, `3_kelas_penilai`.
+  Semuanya **belum pernah dijalankan terhadap Postgres sungguhan** — `migrate deploy` pertama di
+  server adalah ujian nyatanya. Jalankan di DB kosong/kloningan dulu sebelum ke data produksi.
 - Jangan ekspos port `5432` ke publik. Gunakan reverse proxy + HTTPS untuk port 3000.
 - Ganti semua nilai contoh di `.env` sebelum produksi.
