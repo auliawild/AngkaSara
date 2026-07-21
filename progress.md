@@ -10,6 +10,32 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-21 — Cetak Progres Latihan Sekelas per bulan (pemilih bulan) — TUNTAS
+
+### ✅ Permintaan user
+- Bisa mencetak **progres latihan sekelas untuk bulan berbeda-beda**, dengan **pilihan bulan cetak**.
+
+### ✅ Implementasi
+- `lib/progres.ts` **`agregatBulan(aktivitas, tahun, bulan)`** → `RingkasBulan` (totalNum/totalLit/totalPoin +
+  rataNum/rataLit), dibatasi ke **satu bulan kalender** (bukan jendela bergulir). (+2 tes → **113/113**).
+- `server/laporan.ts`: helper **`infoBulan(s?)`** (rentang mulai/selesai, bulanId, bulanLabel, prev/next) —
+  dibagi dgn `muatKalenderSiswa` (di-refactor, perilaku identik). **`muatProgresKelas`** kini terima
+  **`bulan` ("YYYY-MM", default bulan berjalan)** & merekap bulan kalender itu via `agregatBulan`
+  (query PracticeActivity dibatasi `[mulai, selesai)`). `ProgresKelas` kini bawa `bulanId/bulanLabel/prev/next`
+  (field `mode` dibuang). `pilihMode`/`agregatProgres`/`KET_MODE` tetap (dipakai `muatProgresSiswa` tren).
+- Komponen baru **`pilih-bulan.tsx`** (client, no-print, reusable): ‹ Bln lalu · **input `type=month`** · Bln depan ›
+  → navigasi `?bulan=`.
+- `cetak-progres-kelas/page.tsx`: toggle mode (hari/minggu/bulan) **diganti** `PilihBulan`; subjudul jadi
+  "Rekap Bulan {bulanLabel}". Tombol "Cetak Progres Sekelas" di daftar laporan tetap (default = bulan berjalan).
+
+### ✅ Verifikasi
+- `tsc` bersih, **test 113/113**, `npm run build` sukses (23 rute, cetak-progres-kelas terdaftar).
+- Data path DB nyata (X TKJ 1): **Juli 2026** → Budi num1(rata20)/lit1(rata100)/poin42; **Juni & Agustus 2026** →
+  0/0 (terpisah benar per bulan).
+- **Visual cetak saat login staf BELUM di-e2e** (larangan password) — user cek Print Preview + "Background graphics".
+
+---
+
 ## 2026-07-20 — Progres Latihan: Kalender Latihan Harian (per bulan) — TUNTAS
 
 ### ✅ Permintaan user

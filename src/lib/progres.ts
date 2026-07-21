@@ -96,6 +96,46 @@ export function agregatProgres(
   };
 }
 
+/* ══════════ Ringkasan progres SATU BULAN kalender ══════════
+ * Untuk rekap sekelas per bulan (tabel cetak): total pengerjaan & mutu tiap siswa
+ * dibatasi ke bulan (tahun, bulan) tertentu — bukan jendela bergulir.
+ */
+export interface RingkasBulan {
+  totalNum: number; // jumlah pengerjaan numerasi bulan itu
+  totalLit: number; // jumlah pengerjaan literasi bulan itu
+  totalPoin: number;
+  rataNum: number | null; // mutu: rata skor numerasi (0..100)
+  rataLit: number | null;
+}
+
+/** Ringkas aktivitas satu siswa untuk bulan kalender (tahun, bulan 1..12). */
+export function agregatBulan(aktivitas: AktivitasRingkas[], tahun: number, bulan: number): RingkasBulan {
+  let sumNum = 0;
+  let cntNum = 0;
+  let sumLit = 0;
+  let cntLit = 0;
+  let poin = 0;
+  for (const a of aktivitas) {
+    const d = new Date(a.ts);
+    if (d.getFullYear() !== tahun || d.getMonth() + 1 !== bulan) continue;
+    poin += a.points || 0;
+    if (a.domain === "NUMERASI") {
+      sumNum += a.score;
+      cntNum++;
+    } else if (a.domain === "LITERASI") {
+      sumLit += a.score;
+      cntLit++;
+    }
+  }
+  return {
+    totalNum: cntNum,
+    totalLit: cntLit,
+    totalPoin: poin,
+    rataNum: cntNum ? Math.round(sumNum / cntNum) : null,
+    rataLit: cntLit ? Math.round(sumLit / cntLit) : null,
+  };
+}
+
 /* ══════════ Kalender latihan HARIAN dalam satu bulan ══════════
  * Menampilkan tiap tanggal: mengerjakan atau tidak & berapa banyak (numerasi/literasi).
  */

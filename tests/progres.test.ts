@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agregatProgres, agregatKalender, type AktivitasRingkas } from "@/lib/progres";
+import { agregatProgres, agregatKalender, agregatBulan, type AktivitasRingkas } from "@/lib/progres";
 
 const NOW = new Date(2026, 6, 18); // 18 Juli 2026 (Sabtu)
 const A = (d: Date, domain: string, score: number, points = 0): AktivitasRingkas => ({ ts: d, domain, score, points });
@@ -56,6 +56,32 @@ describe("agregatProgres — kosong", () => {
     expect(d.titik).toHaveLength(12);
     expect(d).toMatchObject({ totalAktivitas: 0, totalPoin: 0, bucketAktif: 0, rataNum: null, rataLit: null });
     expect(d.titik.every((t) => t.total === 0 && t.num === null)).toBe(true);
+  });
+});
+
+describe("agregatBulan — ringkasan satu bulan kalender", () => {
+  it("total & rata dibatasi ke bulan; bulan lain diabaikan", () => {
+    const r = agregatBulan(
+      [
+        A(new Date(2026, 6, 3), "NUMERASI", 70, 10),
+        A(new Date(2026, 6, 20), "NUMERASI", 90, 5),
+        A(new Date(2026, 6, 20), "LITERASI", 80, 0),
+        A(new Date(2026, 5, 15), "NUMERASI", 50, 99), // Juni → diabaikan
+        A(new Date(2026, 7, 1), "LITERASI", 40, 99), // Agustus → diabaikan
+      ],
+      2026,
+      7,
+    );
+    expect(r).toMatchObject({ totalNum: 2, totalLit: 1, totalPoin: 15, rataNum: 80, rataLit: 80 });
+  });
+  it("bulan tanpa aktivitas → 0 / null", () => {
+    expect(agregatBulan([], 2026, 2)).toMatchObject({
+      totalNum: 0,
+      totalLit: 0,
+      totalPoin: 0,
+      rataNum: null,
+      rataLit: null,
+    });
   });
 });
 

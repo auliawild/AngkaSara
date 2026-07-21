@@ -24,7 +24,7 @@ import {
   tahunAjaran,
   type Semester,
 } from "@/lib/semester";
-import { agregatProgres, agregatKalender, type ProgresData, type KalenderData } from "@/lib/progres";
+import { agregatProgres, agregatKalender, agregatBulan, type ProgresData, type KalenderData } from "@/lib/progres";
 import type { BucketMode } from "@/lib/kelas";
 
 async function requireStaf(): Promise<void> {
@@ -364,20 +364,23 @@ export interface BarisProgresKelas {
 }
 export interface ProgresKelas {
   kelas: string;
-  mode: BucketMode;
+  bulanId: string; // "YYYY-MM"
+  bulanLabel: string; // "Juli 2026"
+  prev: string;
+  next: string;
   baris: BarisProgresKelas[];
 }
 
 /**
- * Rekap progres latihan seluruh siswa aktif satu kelas untuk satu mode (tabel cetak sekelas).
- * Tarik PracticeActivity ≤400 hari sekali, agregat per siswa (jendela sesuai mode). Null bila kelas tak dikenal.
+ * Rekap progres latihan seluruh siswa aktif satu kelas untuk SATU BULAN kalender (tabel cetak sekelas).
+ * Tarik PracticeActivity bulan itu sekali, agregat per siswa. Null bila kelas tak dikenal. Default = bulan berjalan.
  */
-export async function muatProgresKelas(params: { kelas: string; mode?: string }): Promise<ProgresKelas | null> {
+export async function muatProgresKelas(params: { kelas: string; bulan?: string }): Promise<ProgresKelas | null> {
   await requireStaf();
   const kelasRow = await prisma.kelas.findUnique({ where: { label: params.kelas }, select: { label: true } });
   if (!kelasRow) return null;
 
-  const mode = pilihMode(params.mode);
+  const { tahun, bulan, mulai, selesai, bulanId, bulanLabel, prev, next } = infoBulan(params.bulan);
   const students = await prisma.student.findMany({
     where: { aktif: true, kelas: { label: params.kelas } },
     select: { id: true, nama: true, nisn: true },
@@ -385,11 +388,9 @@ export async function muatProgresKelas(params: { kelas: string; mode?: string })
   });
   const ids = students.map((s) => s.id);
 
-  const sejak = new Date();
-  sejak.setDate(sejak.getDate() - 400);
   const akt = ids.length
     ? await prisma.practiceActivity.findMany({
-        where: { studentId: { in: ids }, createdAt: { gte: sejak } },
+        where: { studentId: { in: ids }, createdAt: { gte: mulai, lt: selesai } },
         select: { studentId: true, createdAt: true, domain: true, score: true, points: true },
       })
     : [];
@@ -402,20 +403,20 @@ export async function muatProgresKelas(params: { kelas: string; mode?: string })
   }
 
   const baris: BarisProgresKelas[] = students.map((st) => {
-    const prog = agregatProgres(byStudent.get(st.id) ?? [], mode);
+    const r = agregatBulan(byStudent.get(st.id) ?? [], tahun, bulan);
     return {
       siswaId: st.id,
       nama: st.nama,
       nisn: st.nisn,
-      totalNum: prog.totalNum,
-      totalLit: prog.totalLit,
-      totalPoin: prog.totalPoin,
-      rataNum: prog.rataNum,
-      rataLit: prog.rataLit,
+      totalNum: r.totalNum,
+      totalLit: r.totalLit,
+      totalPoin: r.totalPoin,
+      rataNum: r.rataNum,
+      rataLit: r.rataLit,
     };
   });
 
-  return { kelas: params.kelas, mode, baris };
+  return { kelas: params.kelas, bulanId, bulanLabel, prev, next, baris };
 }
 
 /* ── Kalender latihan harian (satu bulan) ── */
@@ -432,6 +433,23 @@ function parseBulan(s?: string): { tahun: number; bulan: number } {
   return { tahun: now.getFullYear(), bulan: now.getMonth() + 1 };
 }
 const idBulan = (th: number, bl: number) => `${th}-${String(bl).padStart(2, "0")}`;
+
+/** Semua info satu bulan kalender dari "YYYY-MM": rentang tanggal, label, id, prev/next. */
+function infoBulan(s?: string) {
+  const { tahun, bulan } = parseBulan(s);
+  const prevB = bulan === 1 ? { th: tahun - 1, bl: 12 } : { th: tahun, bl: bulan - 1 };
+  const nextB = bulan === 12 ? { th: tahun + 1, bl: 1 } : { th: tahun, bl: bulan + 1 };
+  return {
+    tahun,
+    bulan,
+    mulai: new Date(tahun, bulan - 1, 1),
+    selesai: new Date(tahun, bulan, 1), // awal bulan berikutnya (eksklusif)
+    bulanId: idBulan(tahun, bulan),
+    bulanLabel: `${BULAN_PANJANG[bulan - 1]} ${tahun}`,
+    prev: idBulan(prevB.th, prevB.bl),
+    next: idBulan(nextB.th, nextB.bl),
+  };
+}
 
 export interface KalenderSiswa {
   nama: string;
@@ -453,9 +471,7 @@ export async function muatKalenderSiswa(params: { siswaId: string; bulan?: strin
   });
   if (!st) return null;
 
-  const { tahun, bulan } = parseBulan(params.bulan);
-  const mulai = new Date(tahun, bulan - 1, 1);
-  const selesai = new Date(tahun, bulan, 1); // awal bulan berikutnya (eksklusif)
+  const { tahun, bulan, mulai, selesai, bulanId, bulanLabel, prev, next } = infoBulan(params.bulan);
 
   const akt = await prisma.practiceActivity.findMany({
     where: { studentId: st.id, createdAt: { gte: mulai, lt: selesai } },
@@ -467,17 +483,5 @@ export async function muatKalenderSiswa(params: { siswaId: string; bulan?: strin
     bulan,
   );
 
-  const prevB = bulan === 1 ? { th: tahun - 1, bl: 12 } : { th: tahun, bl: bulan - 1 };
-  const nextB = bulan === 12 ? { th: tahun + 1, bl: 1 } : { th: tahun, bl: bulan + 1 };
-
-  return {
-    nama: st.nama,
-    nisn: st.nisn,
-    kelasLabel: st.kelas.label,
-    bulanId: idBulan(tahun, bulan),
-    bulanLabel: `${BULAN_PANJANG[bulan - 1]} ${tahun}`,
-    prev: idBulan(prevB.th, prevB.bl),
-    next: idBulan(nextB.th, nextB.bl),
-    kal,
-  };
+  return { nama: st.nama, nisn: st.nisn, kelasLabel: st.kelas.label, bulanId, bulanLabel, prev, next, kal };
 }

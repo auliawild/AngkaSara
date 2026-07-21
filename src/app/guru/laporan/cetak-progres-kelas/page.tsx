@@ -2,16 +2,15 @@ import { headers } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { muatProgresKelas, KET_MODE } from "@/server/laporan";
-import { BUCKET_NAMA, ikonJurusan, type BucketMode } from "@/lib/kelas";
+import { muatProgresKelas } from "@/server/laporan";
+import { ikonJurusan } from "@/lib/kelas";
 import { SEKOLAH } from "@/lib/sekolah";
 import CetakTombol from "../cetak-tombol";
 import CetakWatermark from "../cetak-watermark";
 import KopSekolah from "../kop-sekolah";
+import PilihBulan from "../pilih-bulan";
 
 export const metadata = { title: "Cetak Progres Sekelas — AngkaSara" };
-
-const MODES: BucketMode[] = ["hari", "minggu", "bulan"];
 
 function rataDari(xs: (number | null)[]): number | null {
   const v = xs.filter((x): x is number => x != null);
@@ -21,14 +20,14 @@ function rataDari(xs: (number | null)[]): number | null {
 export default async function CetakProgresKelasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kelas?: string; mode?: string }>;
+  searchParams: Promise<{ kelas?: string; bulan?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   const sp = await searchParams;
   if (!session) redirect("/masuk?tab=staf&next=/guru/laporan");
   if (!sp.kelas) redirect("/guru/laporan");
 
-  const d = await muatProgresKelas({ kelas: sp.kelas, mode: sp.mode });
+  const d = await muatProgresKelas({ kelas: sp.kelas, bulan: sp.bulan });
   if (!d) notFound();
 
   const base = `/guru/laporan/cetak-progres-kelas?kelas=${encodeURIComponent(d.kelas)}`;
@@ -42,29 +41,14 @@ export default async function CetakProgresKelasPage({
   return (
     <main className="mx-auto flex w-full max-w-[210mm] flex-1 flex-col gap-5 px-6 py-8">
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href={`/guru/laporan?kelas=${encodeURIComponent(d.kelas)}`}
             className="text-sm text-blue-600 hover:underline dark:text-blue-400"
           >
             ← Daftar {d.kelas}
           </Link>
-          <div className="flex gap-1 rounded-lg bg-black/5 p-1 text-sm dark:bg-white/10">
-            {MODES.map((m) => (
-              <Link
-                key={m}
-                href={`${base}&mode=${m}`}
-                className={
-                  "rounded-md px-3 py-1 transition-colors " +
-                  (d.mode === m
-                    ? "bg-white font-medium shadow-sm dark:bg-zinc-700"
-                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200")
-                }
-              >
-                {BUCKET_NAMA[m]}
-              </Link>
-            ))}
-          </div>
+          <PilihBulan base={base} bulanId={d.bulanId} bulanLabel={d.bulanLabel} prev={d.prev} next={d.next} />
         </div>
         <CetakTombol label="🖨️ Cetak Rekap" />
       </div>
@@ -79,7 +63,7 @@ export default async function CetakProgresKelasPage({
           Literasi &amp; Numerasi
         </h2>
         <p className="mt-1 text-center text-sm text-zinc-600">
-          Kelas {ikonJurusan(d.kelas)} {d.kelas} · Rekap {BUCKET_NAMA[d.mode]} ({KET_MODE[d.mode]})
+          Kelas {ikonJurusan(d.kelas)} {d.kelas} · Rekap Bulan {d.bulanLabel}
         </p>
 
         <table className="mt-4 w-full border-collapse text-sm">
