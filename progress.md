@@ -10,6 +10,33 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-22 — HYD-01 tuntas: hydration mismatch di grafik Evaluasi — TUNTAS
+
+### ✅ Masalah
+- `/guru/evaluasi` mencetak `hydration-mismatch` di `app/guru/evaluasi/grafik.tsx:56` pada `<title>`
+  SVG. Pola **sama persis** dgn HYD-01 yg sudah diperbaiki di `progres-chart.tsx` (commit `aa2339b`)
+  — berkas ini **terlewat** waktu itu. Ditemukan saat mengerjakan lingkup kelas (bukan regresi darinya).
+
+### ✅ Perbaikan
+- Isi `<title>` dirakit jadi **satu string** lalu dirender sbg anak tunggal (`const judul = …;
+  <title>{judul}</title>`), persis solusi HYD-01. Sebab: React menyisipkan **komentar pemisah**
+  (`<!-- -->`) antar-anak teks saat SSR, dan komentar itu hilang saat browser memparse `<title>`
+  di dalam SVG → HTML server ≠ hydration klien.
+
+### ✅ Yang SENGAJA tidak diubah (penting)
+- Sempat dicurigai 6 `<option>` beranak-ganda (`{ikonJurusan(k)} {k}` di filter evaluasi/laporan/
+  peringkat, simulasi, nilai-ringkasan) kena pola sama. **Dicek langsung di DOM: TIDAK.** `<option>`
+  **tetap menyimpan** komentar pemisahnya (`nodeType 3,8,3,8,3`) sehingga server & klien cocok.
+  Yang bermasalah **khusus `<title>` di dalam SVG**. Tidak diubah — buglog HYD-01 sudah diberi
+  peringatan agar tak ada yang "merapikan"-nya kelak.
+
+### ✅ Verifikasi
+- Live `/guru/evaluasi`: **nol error konsol & server**; tiap `<title>` kini berisi **satu node teks**
+  (`nodeType 3`, tanpa `8`) dgn isi benar ("Jul '26 — Numerasi: 0"), 3 titik ter-render.
+- `tsc` bersih, `eslint` bersih, tes 117/117, build sukses.
+
+---
+
 ## 2026-07-22 — Lingkup kelas diperluas ke Laporan/Progres & Evaluasi — TUNTAS
 
 ### ✅ Permintaan user

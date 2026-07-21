@@ -51,13 +51,16 @@ export default function Grafik({ data }: { data: TitikPerkembangan[] }) {
             return (
               <g key={s.key}>
                 <path d={path} fill="none" stroke={s.color} strokeWidth={s.tebal ? 3 : 2} strokeLinejoin="round" strokeLinecap="round" />
-                {pts.map((p) => (
-                  <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={3.5} fill="#fff" stroke={s.color} strokeWidth={2}>
-                    <title>
-                      {bucketLabel(data[p.i].period, "bulan")} — {s.nama}: {p.v}
-                    </title>
-                  </circle>
-                ))}
+                {pts.map((p) => {
+                  // Satu string, satu anak: <title> diparse sbg teks mentah, jadi beberapa anak
+                  // JSX memicu hydration mismatch (buglog HYD-01).
+                  const judul = `${bucketLabel(data[p.i].period, "bulan")} — ${s.nama}: ${p.v}`;
+                  return (
+                    <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={3.5} fill="#fff" stroke={s.color} strokeWidth={2}>
+                      <title>{judul}</title>
+                    </circle>
+                  );
+                })}
               </g>
             );
           })}

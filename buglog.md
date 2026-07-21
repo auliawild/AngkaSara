@@ -24,13 +24,22 @@
 - **Gejala:** badge merah **"1 Issue"** di pojok kiri-bawah `/guru/laporan/‹siswaId›`; terminal dev
   mencetak `hydration-mismatch` menunjuk `progres-chart.tsx:53` pada elemen `<title>`.
   Halaman tetap tampil — jadi mudah terlewat.
-- **Sebab:** `<title>` (juga `<textarea>`, `<option>`) diparse browser sebagai **teks mentah**.
-  Isinya ditulis sbg beberapa anak JSX (`{t.label} — {t.total} aktivitas` + 2 ekspresi kondisional);
-  React menyisipkan penanda pemisah antar-anak teks saat SSR, dan penanda itu hilang saat browser
-  memparse `<title>` → HTML server ≠ hasil hydration klien.
+- **Sebab:** isi `<title>` ditulis sbg **beberapa anak JSX** (`{t.label} — {t.total} aktivitas` + 2
+  ekspresi kondisional). React menyisipkan **komentar pemisah** (`<!-- -->`) antar-anak teks saat SSR,
+  dan komentar itu **hilang saat browser memparse `<title>` di dalam SVG** → HTML server ≠ hasil
+  hydration klien.
 - **Solusi:** rakit isinya jadi **satu string** di JS lalu render sebagai anak tunggal:
   `const judul = ...; <title>{judul}</title>`.
-- **Status:** ✅ teratasi (terverifikasi live: badge Issue hilang, mode Harian/Mingguan/Bulanan render 200).
+- **Status:** ✅ teratasi di **dua** berkas:
+  - `laporan/[siswaId]/progres-chart.tsx` (commit `aa2339b`)
+  - `guru/evaluasi/grafik.tsx` (2026-07-22) — **terlewat pada perbaikan pertama**; gejalanya sama
+    persis di `/guru/evaluasi`. Verifikasi: tiap `<title>` kini berisi **satu node teks** (nodeType 3,
+    tanpa nodeType 8), nol error konsol & server.
+- **JANGAN ikut "memperbaiki" `<option>`/`<textarea>`.** Sempat dicurigai kena pola yang sama, tapi
+  dicek langsung di DOM: `<option>` yang isinya `{ikonJurusan(k)} {k}` **tetap menyimpan** komentar
+  pemisahnya (`nodeType 3,8,3,8,3`) sehingga server & klien tetap cocok — tak ada mismatch. Yang
+  bermasalah **khusus `<title>` di dalam SVG**. Ada 6 `<option>` beranak-ganda di `src/` (filter
+  evaluasi/laporan/peringkat, simulasi, nilai-ringkasan) dan semuanya sehat — biarkan.
 
 ## MEM-01 — "Jest worker encountered N child process exceptions, exceeding retry limit"
 - **Gejala:** membuka halaman berat (mis. `/guru/laporan/‹siswaId›?semester=2026-1`) di `next dev`
