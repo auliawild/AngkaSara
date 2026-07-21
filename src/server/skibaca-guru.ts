@@ -4,26 +4,9 @@
  * skor otomatis. Guru membaca teks asli + POIN KUNCI (kunci soal, hanya untuk guru) + ringkasan
  * siswa, lalu memberi skor (0..100) & catatan. Semua aksi butuh sesi staf (Better Auth).
  */
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-/**
- * Lingkup kelas yang boleh dinilai staf yang sedang login.
- * `dibatasi=false` (tak ada penugasan) = akses SEMUA kelas (perilaku lama, admin utama & guru).
- * `dibatasi=true` = hanya `labels` (admin yang ditugasi kelas tertentu).
- */
-async function lingkupKelas(): Promise<{ dibatasi: boolean; labels: string[] }> {
-  const s = await auth.api.getSession({ headers: await headers() });
-  if (!s) throw new Error("Sesi staf tidak ditemukan.");
-  const u = await prisma.user.findUnique({
-    where: { id: s.user.id },
-    select: { kelasDinilai: { select: { label: true } } },
-  });
-  const labels = (u?.kelasDinilai ?? []).map((k) => k.label);
-  return { dibatasi: labels.length > 0, labels };
-}
+import { lingkupKelas } from "@/server/lingkup";
 
 export interface RingkasanUntukGuru {
   id: string;

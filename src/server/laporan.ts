@@ -1,6 +1,5 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { lingkupKelas, bolehKelas, whereLabel, dibatasiKe, type Lingkup } from "@/server/lingkup";
 import { urutkanKelas, BULAN_PANJANG } from "@/lib/kelas";
 import {
   agregatDiagLiterasi,
@@ -27,33 +26,40 @@ import {
 import { agregatProgres, agregatKalender, agregatBulan, type ProgresData, type KalenderData } from "@/lib/progres";
 import type { BucketMode } from "@/lib/kelas";
 
-async function requireStaf(): Promise<void> {
-  const s = await auth.api.getSession({ headers: await headers() });
-  if (!s) throw new Error("Sesi staf tidak ditemukan.");
-}
-
 /** Opsi filter (kelas & semester) — dipakai halaman daftar laporan. */
 export interface OpsiLaporan {
   kelasOpsi: string[];
   semesterOpsi: { id: string; label: string }[];
+  /** Kelas yang menjadi lingkup staf ini; null = semua kelas (tak dibatasi). */
+  dibatasiKe: string[] | null;
 }
 
-async function opsiSemester(): Promise<Semester[]> {
+async function opsiSemester(l: Lingkup): Promise<Semester[]> {
+  const labelIn = whereLabel(l);
   const rows = await prisma.checkpointResult.findMany({
-    where: { status: "submitted" },
+    where: { status: "submitted", ...(labelIn ? { kelasLabel: labelIn } : {}) },
     distinct: ["period"],
     select: { period: true },
   });
   return daftarSemester(rows.map((r) => r.period));
 }
 
+/**
+ * Opsi filter, sudah dipersempit ke lingkup kelas staf. Ini sekaligus penjaga utama
+ * `muatLaporanKelas`: kelas di luar lingkup tak pernah lolos validasi `kelasOpsi`.
+ */
 export async function muatOpsiLaporan(): Promise<OpsiLaporan> {
-  await requireStaf();
-  const kelasRows = await prisma.kelas.findMany({ where: { aktif: true }, select: { label: true } });
-  const sems = await opsiSemester();
+  const lingkup = await lingkupKelas();
+  const labelIn = whereLabel(lingkup);
+  const kelasRows = await prisma.kelas.findMany({
+    where: { aktif: true, ...(labelIn ? { label: labelIn } : {}) },
+    select: { label: true },
+  });
+  const sems = await opsiSemester(lingkup);
   return {
     kelasOpsi: kelasRows.map((k) => k.label).sort(urutkanKelas),
     semesterOpsi: sems.map((s) => ({ id: semesterId(s), label: labelSemester(s) })),
+    dibatasiKe: dibatasiKe(lingkup),
   };
 }
 
@@ -219,12 +225,12 @@ export interface LaporanKelas {
   semesterLabel: string;
   baris: BarisKelas[];
   adaSiswa: boolean;
+  dibatasiKe: string[] | null;
 }
 
-/** Daftar progres siswa satu kelas untuk satu semester. */
+/** Daftar progres siswa satu kelas untuk satu semester. Kelas di luar lingkup staf → dianggap belum dipilih. */
 export async function muatLaporanKelas(params: { kelas?: string; semester?: string }): Promise<LaporanKelas> {
-  await requireStaf();
-  const opsi = await muatOpsiLaporan();
+  const opsi = await muatOpsiLaporan(); // sekaligus penjaga sesi + penyaring lingkup
   const s = pilihSemester(params.semester);
   const kelas = params.kelas && opsi.kelasOpsi.includes(params.kelas) ? params.kelas : null;
 
@@ -250,6 +256,7 @@ export async function muatLaporanKelas(params: { kelas?: string; semester?: stri
     semesterLabel: labelSemester(s),
     baris,
     adaSiswa: baris.length > 0,
+    dibatasiKe: opsi.dibatasiKe,
   };
 }
 
@@ -260,15 +267,18 @@ export interface RaportDetail {
   tahunAjaran: string; // "2026/2027"
 }
 
-/** Raport lengkap satu siswa untuk satu semester (untuk halaman detail & cetak). Null bila siswa tak ada. */
+/**
+ * Raport lengkap satu siswa untuk satu semester (untuk halaman detail & cetak).
+ * Null bila siswa tak ada ATAU kelasnya di luar lingkup staf (halaman memanggil `notFound()`).
+ */
 export async function muatRaportSiswa(params: { siswaId: string; semester?: string }): Promise<RaportDetail | null> {
-  await requireStaf();
+  const lingkup = await lingkupKelas();
   const s = pilihSemester(params.semester);
   const st = await prisma.student.findUnique({
     where: { id: params.siswaId },
     select: { id: true, nama: true, nisn: true, kelas: { select: { label: true } } },
   });
-  if (!st) return null;
+  if (!st || !bolehKelas(lingkup, st.kelas.label)) return null;
 
   const raport = await kumpulkanRaport(
     [{ id: st.id, nama: st.nama, nisn: st.nisn, kelasLabel: st.kelas.label }],
@@ -290,9 +300,10 @@ export interface RaportKelas {
   daftar: { id: string; raport: RaportSiswa }[];
 }
 
-/** Raport seluruh siswa aktif satu kelas (untuk cetak sekelas). Null bila kelas tak dikenal. */
+/** Raport seluruh siswa aktif satu kelas (untuk cetak sekelas). Null bila kelas tak dikenal / di luar lingkup. */
 export async function muatRaportKelas(params: { kelas: string; semester?: string }): Promise<RaportKelas | null> {
-  await requireStaf();
+  const lingkup = await lingkupKelas();
+  if (!bolehKelas(lingkup, params.kelas)) return null;
   const s = pilihSemester(params.semester);
   const kelasRow = await prisma.kelas.findUnique({ where: { label: params.kelas }, select: { label: true } });
   if (!kelasRow) return null;
@@ -327,9 +338,12 @@ export function pilihMode(m?: string): BucketMode {
  * Ambil aktivitas ≤ ~400 hari terakhir (cukup untuk jendela terbesar: 12 bulan). Null bila siswa tak ada.
  */
 export async function muatProgresSiswa(params: { siswaId: string; mode?: string }): Promise<ProgresData | null> {
-  await requireStaf();
-  const st = await prisma.student.findUnique({ where: { id: params.siswaId }, select: { id: true } });
-  if (!st) return null;
+  const lingkup = await lingkupKelas();
+  const st = await prisma.student.findUnique({
+    where: { id: params.siswaId },
+    select: { id: true, kelas: { select: { label: true } } },
+  });
+  if (!st || !bolehKelas(lingkup, st.kelas.label)) return null;
 
   const mode = pilihMode(params.mode);
   const sejak = new Date();
@@ -376,7 +390,8 @@ export interface ProgresKelas {
  * Tarik PracticeActivity bulan itu sekali, agregat per siswa. Null bila kelas tak dikenal. Default = bulan berjalan.
  */
 export async function muatProgresKelas(params: { kelas: string; bulan?: string }): Promise<ProgresKelas | null> {
-  await requireStaf();
+  const lingkup = await lingkupKelas();
+  if (!bolehKelas(lingkup, params.kelas)) return null;
   const kelasRow = await prisma.kelas.findUnique({ where: { label: params.kelas }, select: { label: true } });
   if (!kelasRow) return null;
 
@@ -462,14 +477,14 @@ export interface KalenderSiswa {
   kal: KalenderData;
 }
 
-/** Kalender latihan harian satu siswa untuk satu bulan (layar & cetak). Null bila siswa tak ada. */
+/** Kalender latihan harian satu siswa untuk satu bulan (layar & cetak). Null bila siswa tak ada / di luar lingkup. */
 export async function muatKalenderSiswa(params: { siswaId: string; bulan?: string }): Promise<KalenderSiswa | null> {
-  await requireStaf();
+  const lingkup = await lingkupKelas();
   const st = await prisma.student.findUnique({
     where: { id: params.siswaId },
     select: { id: true, nama: true, nisn: true, kelas: { select: { label: true } } },
   });
-  if (!st) return null;
+  if (!st || !bolehKelas(lingkup, st.kelas.label)) return null;
 
   const { tahun, bulan, mulai, selesai, bulanId, bulanLabel, prev, next } = infoBulan(params.bulan);
 

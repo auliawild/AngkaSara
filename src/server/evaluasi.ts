@@ -1,6 +1,5 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { lingkupKelas, whereLabel, dibatasiKe } from "@/server/lingkup";
 import { periodKey, urutkanKelas, BULAN_PANJANG } from "@/lib/kelas";
 import {
   ringkasan,
@@ -33,29 +32,34 @@ export interface EvaluasiData {
   chartPeriods: string[];
   belum: { nama: string; kelasLabel: string }[];
   adaData: boolean;
+  /** Kelas yang menjadi lingkup staf ini; null = semua kelas (tak dibatasi). */
+  dibatasiKe: string[] | null;
 }
 
-async function requireStaf(): Promise<void> {
-  const s = await auth.api.getSession({ headers: await headers() });
-  if (!s) throw new Error("Sesi staf tidak ditemukan.");
-}
-
-/** Muat semua data dashboard Evaluasi untuk (kelas, periode) terpilih. Hanya staf. */
+/**
+ * Muat semua data dashboard Evaluasi untuk (kelas, periode) terpilih. Hanya staf.
+ * Staf yang ditugasi kelas tertentu hanya melihat kelas itu — di seluruh angka, bukan
+ * sekadar dropdown: opsi kelas, daftar siswa, hasil Check Point, dan grafik perkembangan.
+ */
 export async function muatEvaluasi(params: { kelas?: string; period?: string }): Promise<EvaluasiData> {
-  await requireStaf();
+  const lingkup = await lingkupKelas();
+  const labelIn = whereLabel(lingkup);
 
-  const kelasRows = await prisma.kelas.findMany({ where: { aktif: true }, select: { label: true } });
+  const kelasRows = await prisma.kelas.findMany({
+    where: { aktif: true, ...(labelIn ? { label: labelIn } : {}) },
+    select: { label: true },
+  });
   const kelasOpsi = kelasRows.map((k) => k.label).sort(urutkanKelas);
 
   const students = await prisma.student.findMany({
-    where: { aktif: true },
+    where: { aktif: true, ...(labelIn ? { kelas: { label: labelIn } } : {}) },
     select: { id: true, nama: true, kelas: { select: { label: true } } },
   });
   const jumlahPerKelas = new Map<string, number>();
   for (const s of students) jumlahPerKelas.set(s.kelas.label, (jumlahPerKelas.get(s.kelas.label) || 0) + 1);
 
   const periodeRows = await prisma.checkpointResult.findMany({
-    where: { status: "submitted" },
+    where: { status: "submitted", ...(labelIn ? { kelasLabel: labelIn } : {}) },
     distinct: ["period"],
     select: { period: true },
     orderBy: { period: "desc" },
@@ -66,7 +70,7 @@ export async function muatEvaluasi(params: { kelas?: string; period?: string }):
 
   // Hasil periode terpilih (semua kelas) → rekap.
   const resP: ResultRow[] = await prisma.checkpointResult.findMany({
-    where: { status: "submitted", period },
+    where: { status: "submitted", period, ...(labelIn ? { kelasLabel: labelIn } : {}) },
     select: SELECT_RES,
   });
   const kelasJumlah = kelasOpsi.map((label) => ({ label, jumlah: jumlahPerKelas.get(label) || 0 }));
@@ -93,7 +97,8 @@ export async function muatEvaluasi(params: { kelas?: string; period?: string }):
         where: {
           status: "submitted",
           period: { in: chartPeriods },
-          ...(kelas !== "all" ? { kelasLabel: kelas } : {}),
+          // Kelas terpilih menyempitkan lebih jauh; "all" tetap dibatasi lingkup staf.
+          ...(kelas !== "all" ? { kelasLabel: kelas } : labelIn ? { kelasLabel: labelIn } : {}),
         },
         select: SELECT_RES,
       })
@@ -113,5 +118,6 @@ export async function muatEvaluasi(params: { kelas?: string; period?: string }):
     chartPeriods,
     belum,
     adaData: periodeOpsi.length > 0,
+    dibatasiKe: dibatasiKe(lingkup),
   };
 }

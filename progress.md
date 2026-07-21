@@ -10,6 +10,60 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-22 — Lingkup kelas diperluas ke Laporan/Progres & Evaluasi — TUNTAS
+
+### ✅ Permintaan user
+- Kelas yang diatur untuk seorang staf bukan cuma **bisa dinilai**, tapi juga membatasi **Progres
+  (Laporan) & Evaluasi** — hanya kelas yang ditugaskan.
+- **Peringkat gabungan TETAP se-sekolah** (seluruh siswa), tidak dibatasi.
+
+### ✅ Implementasi
+- Helper `lingkupKelas()` yang dulu privat di `server/skibaca-guru.ts` **diangkat & dipakai bersama**:
+  - **`lib/lingkup.ts`** (MURNI, teruji): `Lingkup`, `lingkupDari`, `bolehKelas`, `whereLabel`
+    (potongan `where` Prisma), `dibatasiKe` (untuk banner UI).
+  - **`server/lingkup.ts`**: pembaca sesi+DB (`kelasDinilai`), meneruskan helper murni agar
+    pemanggil cukup impor satu modul. `skibaca-guru.ts` kini memakai ini (perilaku tak berubah).
+  - **Semantik lama dipertahankan: daftar kosong = akses SEMUA kelas** → admin utama & guru lama
+    tidak terpengaruh sama sekali.
+- **`server/evaluasi.ts`** (`muatEvaluasi`): lingkup diterapkan ke **seluruh angka**, bukan cuma
+  dropdown — opsi kelas, daftar siswa, opsi periode, hasil Check Point periode terpilih, dan query
+  grafik perkembangan (saat kelas="all" tetap dibatasi lingkup). `requireStaf` lokal dibuang
+  (digantikan `lingkupKelas()` yang juga menjaga sesi). +field `dibatasiKe`.
+- **`server/laporan.ts`** — ketujuh loader:
+  - `muatOpsiLaporan` menyaring `kelasOpsi` + opsi semester → otomatis jadi penjaga `muatLaporanKelas`
+    (kelas luar lingkup tak lolos validasi → dianggap belum pilih kelas). +field `dibatasiKe`.
+  - `muatRaportSiswa`, `muatProgresSiswa`, `muatKalenderSiswa` cek kelas siswa; `muatRaportKelas`,
+    `muatProgresKelas` cek label kelas → **return null** bila di luar lingkup. Ketiga halaman cetak
+    & halaman detail sudah memanggil `notFound()` pada null, jadi **akses via URL langsung → 404**
+    tanpa perlu ubah halaman.
+  - `requireStaf` lokal dibuang.
+- **`server/peringkat.ts` SENGAJA tidak disentuh** (sesuai permintaan) — dicatat di komentar
+  `lib/lingkup.ts` & `server/lingkup.ts` supaya tak "dirapikan" orang lain kelak.
+- **UI**: komponen `app/guru/lingkup-banner.tsx` (dipasang di `/guru/laporan` & `/guru/evaluasi`) —
+  tanpa ini staf ber-lingkup mengira datanya hilang/bug. Label yang tadinya mengklaim "semua kelas"
+  di Evaluasi (subjudul, "N siswa belum mengerjakan", judul "Rekap Semua Kelas") kini menyesuaikan
+  jadi "kelas yang ditugaskan"/"Rekap Kelas Anda" saat dibatasi.
+
+### ✅ Verifikasi
+- `tsc` bersih, `eslint` bersih, **tes 117/117** (+3 tes `lib/lingkup.ts`: kosong=semua, batasi tepat,
+  cocok persis bukan awalan).
+- **E2E live** dengan akun staf yang sedang login (kebetulan sudah ditugasi **X TKJ 1 + X TKR 2**):
+  - `/guru/laporan`: dropdown hanya 2 kelas (dari 46), banner tampil, tabel X TKJ 1 = 5 siswa.
+  - `/guru/evaluasi`: siswa 5 (bukan 9), rekap hanya 2 kelas, banner tampil, subjudul "kelas yang ditugaskan".
+  - **Luar lingkup → 404**: `/guru/laporan/‹id siswa XI TKR 2›` dan
+    `/guru/laporan/cetak-progres-kelas?kelas=XI TKR 2`. Dalam lingkup → render normal.
+  - **`/guru/peringkat` tetap 9 siswa se-sekolah** termasuk XI TKR 2 → isolasi peringkat terbukti utuh.
+  - `/guru/skibaca` (yang di-refactor) masih normal: tab "Semua" tetap menampilkan 1 ringkasan X TKJ 1,
+    nol error konsol.
+
+### ⚠️ Temuan sampingan (BUKAN dari perubahan ini)
+- `/guru/evaluasi` memicu **hydration mismatch** di `app/guru/evaluasi/grafik.tsx:56` — pola bug yang
+  sama persis dgn **HYD-01** (`<title>` SVG berisi banyak anak JSX) yang sudah diperbaiki di
+  `progres-chart.tsx` (commit `aa2339b`), tapi file ini terlewat. Perbaikannya satu baris (rakit jadi
+  satu string). **Belum diperbaiki** — sengaja dipisah agar commit ini tetap fokus.
+
+---
+
 ## 2026-07-21 — Simulasi Modul untuk guru (sandbox, tanpa simpan) — TUNTAS
 
 ### ✅ Permintaan user

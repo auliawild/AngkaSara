@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { muatLaporanKelas } from "@/server/laporan";
 import { ikonJurusan } from "@/lib/kelas";
 import FilterLaporan from "./filter";
+import LingkupBanner from "../lingkup-banner";
 
 export const metadata = { title: "Laporan Progres — AngkaSara" };
 
@@ -41,6 +42,8 @@ export default async function LaporanPage({
           semester={d.semesterId}
         />
       </header>
+
+      <LingkupBanner kelas={d.dibatasiKe} />
 
       {!d.kelas ? (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">

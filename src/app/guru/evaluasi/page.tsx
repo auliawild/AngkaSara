@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { muatEvaluasi } from "@/server/evaluasi";
+import LingkupBanner from "../lingkup-banner";
 import { ikonJurusan } from "@/lib/kelas";
 import FilterEvaluasi from "./filter";
 import Grafik from "./grafik";
@@ -34,13 +35,16 @@ export default async function EvaluasiPage({
             <h1 className="text-2xl font-bold">Evaluasi</h1>
           </div>
           <p className="mt-1 text-sm text-zinc-500">
-            Data terpusat dari server — {d.kelas === "all" ? "seluruh kelas" : d.kelas} · {d.namaBulan}
+            Data terpusat dari server —{" "}
+            {d.kelas === "all" ? (d.dibatasiKe ? "kelas yang ditugaskan" : "seluruh kelas") : d.kelas} · {d.namaBulan}
           </p>
         </div>
         <div className="print:hidden">
           <FilterEvaluasi kelasOpsi={d.kelasOpsi} periodeOpsi={d.periodeOpsi} kelas={d.kelas} period={d.period} />
         </div>
       </header>
+
+      <LingkupBanner kelas={d.dibatasiKe} />
 
       {!d.adaData && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
@@ -86,7 +90,8 @@ export default async function EvaluasiPage({
         ) : (
           <>
             <p className="mt-1 text-sm text-zinc-500">
-              {d.belum.length} siswa belum mengerjakan{d.kelas === "all" ? " (semua kelas)" : ""}.
+              {d.belum.length} siswa belum mengerjakan
+              {d.kelas === "all" ? (d.dibatasiKe ? " (kelas yang ditugaskan)" : " (semua kelas)") : ""}.
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {d.belum.slice(0, CHIP_MAKS).map((s, i) => (
@@ -112,7 +117,9 @@ export default async function EvaluasiPage({
       {/* Rekap semua kelas */}
       <section className="rounded-xl border border-black/10 dark:border-white/15">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 px-5 py-3 dark:border-white/15">
-          <h2 className="font-semibold">🗂️ Rekap Semua Kelas — {d.namaBulan}</h2>
+          <h2 className="font-semibold">
+            🗂️ Rekap {d.dibatasiKe ? "Kelas Anda" : "Semua Kelas"} — {d.namaBulan}
+          </h2>
           <div className="flex gap-2 text-sm print:hidden">
             <a href={`/guru/evaluasi/export${eksporQS}&format=csv`} className="rounded-lg border border-black/15 px-3 py-1.5 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
               ⬇ CSV
