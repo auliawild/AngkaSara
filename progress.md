@@ -10,6 +10,33 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-22 — Podium Peringkat (import desain "Dashboard Guru.dc.html") — TUNTAS
+
+### ✅ Konteks
+- User mengimpor desain claude.ai/design **"Dashboard guru mobile friendly"**
+  (`Dashboard Guru.dc.html`, via DesignSync) dan minta diimplementasikan. Ternyata inti desain
+  (Beranda hero + Ringkasan Sekolah + Menu Pengelolaan, tab bar bawah 5 tab, Profil) **sudah ada**
+  sejak commit `ed656de` — dasbor itu memang dibangun dari desain ini. Satu-satunya elemen mockup
+  yang belum ada di app: **podium Peringkat** (top-3 medali + tiang warna). User memilih menambah ini.
+
+### ✅ Implementasi
+- Berkas baru `src/app/guru/peringkat/podium.tsx` (komponen SERVER): top-3 dari `d.siswa` (sudah
+  tersortir), juara di tengah (tiang tertinggi 80px), perak kiri (58px), perunggu kanan (44px).
+  Avatar **inisial** (netral, tanpa emoji gender), badge `medali()`, tiang gradien tone emas
+  `#eab308`/perak `#94a3b8`/perunggu `#f97316`, nama nge-link ke `/guru/laporan/[siswaId]`.
+- **Aturan "tanpa medali untuk nilai 0" dihormati**: hanya siswa `nilai > 0` yang masuk podium;
+  bila belum ada yang berlatih → komponen return null (sejalan `medali()`). Degradasi mulus:
+  1 siswa → hanya kolom emas; 2 → +perak; 3 → lengkap.
+- `page.tsx`: render `<Podium rows={d.siswa} />` **khusus lingkup sekolah**, di atas tabel.
+
+### ✅ Verifikasi
+- `tsc` bersih, `eslint` bersih, **tes 117/117**, route `/guru/peringkat` compile (307→/masuk).
+- Data path DB nyata (skrip mirror `kumpulkanData`): 9 siswa, 1 bernilai>0 (Budi #1, 30.5) →
+  podium tampil hanya kolom emas; 8 siswa nilai 0 benar tak dapat medali.
+- Visual dikonfirmasi via pratinjau statik yang meniru persis komponen (podium 3-arah + 1-pemenang).
+
+---
+
 ## 2026-07-22 — HYD-01 tuntas: hydration mismatch di grafik Evaluasi — TUNTAS
 
 ### ✅ Masalah

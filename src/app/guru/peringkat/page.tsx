@@ -7,6 +7,7 @@ import { muatPeringkatSekolah } from "@/server/peringkat";
 import { susunPeringkat, medali } from "@/lib/peringkat";
 import FilterPeringkat from "./filter";
 import TabelPeringkat from "./tabel";
+import Podium from "./podium";
 
 export const metadata = { title: "Peringkat — AngkaSara" };
 
@@ -52,6 +53,8 @@ export default async function PeringkatPage({
         Nilai akhir = rata-rata kedua modul, jadi numerasi & literasi berbobot sama. Nilai seri
         berbagi peringkat yang sama; yang lebih banyak beraktivitas ditempatkan lebih dulu.
       </p>
+
+      {lingkup === "sekolah" && <Podium rows={d.siswa} />}
 
       {lingkup === "antarkelas" ? (
         <section className="rounded-xl border border-black/10 dark:border-white/15">
