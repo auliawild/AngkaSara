@@ -21,8 +21,8 @@ export default function FilterPeringkat({
   };
 
   const tab =
-    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors border border-black/10 dark:border-white/15";
-  const aktif = "bg-blue-600 text-white border-blue-600 dark:border-blue-600";
+    "rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border border-black/10 bg-white/60 backdrop-blur dark:border-white/15 dark:bg-white/5";
+  const aktif = "bg-violet-600 text-white border-violet-600 dark:border-violet-600";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -39,7 +39,7 @@ export default function FilterPeringkat({
       ))}
       {lingkup === "kelas" && (
         <select
-          className="rounded-lg border border-black/15 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-white/20"
+          className="rounded-xl border border-black/15 bg-white/60 px-3 py-1.5 text-sm outline-none backdrop-blur focus:border-violet-500 dark:border-white/20 dark:bg-white/5"
           value={kelas}
           onChange={(e) => pergi("kelas", e.target.value)}
         >

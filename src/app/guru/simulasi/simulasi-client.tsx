@@ -81,8 +81,8 @@ export default function SimulasiClient({ topik, bacaan }: { topik: SimTopik[]; b
       {tab === "math" ? <MathPanel topik={topik} catat={catat} /> : <BacaPanel bacaan={bacaan} catat={catat} />}
 
       {/* Papan skor */}
-      <section className="rounded-2xl border border-black/10 dark:border-white/15">
-        <div className="flex items-center justify-between border-b border-black/10 px-4 py-2.5 dark:border-white/15">
+      <section className="as-pop rounded-2xl border border-black/5 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+        <div className="flex items-center justify-between border-b border-black/5 px-4 py-2.5 dark:border-white/10">
           <h2 className="text-sm font-extrabold">🏆 Papan Skor Simulasi</h2>
           {papan.length > 0 && (
             <button onClick={reset} className="text-xs font-semibold text-red-600 hover:underline dark:text-red-400">
@@ -160,7 +160,7 @@ function MathPanel({ topik, catat }: { topik: SimTopik[]; catat: (s: Omit<Skor, 
       const r = await simMulaiArena({ topicId, level });
       const nama = topik.find((t) => t.id === topicId)?.name ?? topicId;
       setHasil(null);
-      setSesi({ soal: toSoal(r.soal), token: r.token, kind: "arena", judul: `${nama} · Level ${level}`, detik: r.detikPerSoal, warna: "#0057ff" });
+      setSesi({ soal: toSoal(r.soal), token: r.token, kind: "arena", judul: `${nama} · Level ${level}`, detik: r.detikPerSoal, warna: "#7c3aed" });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -206,7 +206,7 @@ function MathPanel({ topik, catat }: { topik: SimTopik[]; catat: (s: Omit<Skor, 
       {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
       {hasil && <KartuHasil skor={hasil.skor} ringkas={hasil.ringkas} />}
 
-      <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+      <div className="as-pop rounded-2xl border border-black/5 bg-white/60 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
         <h3 className="text-sm font-extrabold">🎯 Tes Diagnostik</h3>
         <p className="mt-1 text-xs text-zinc-500">30 soal numerasi campuran, seperti diagnostik siswa. Menghasilkan saran level.</p>
         <button onClick={mulaiDiag} disabled={loading} className="mt-3 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
@@ -214,7 +214,7 @@ function MathPanel({ topik, catat }: { topik: SimTopik[]; catat: (s: Omit<Skor, 
         </button>
       </div>
 
-      <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+      <div className="as-pop rounded-2xl border border-black/5 bg-white/60 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
         <h3 className="text-sm font-extrabold">🏟️ Arena (contoh level)</h3>
         <p className="mt-1 text-xs text-zinc-500">10 soal satu topik & level. Semua level terbuka di simulasi.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -271,23 +271,23 @@ function BacaPanel({ bacaan, catat }: { bacaan: SimBacaanKlien[]; catat: (s: Omi
   }
 
   if (bacaan.length === 0)
-    return <p className="rounded-2xl border border-black/10 p-4 text-sm text-zinc-500 dark:border-white/15">Belum ada bacaan contoh di basis data. Jalankan seed SKIBACA lebih dulu.</p>;
+    return <p className="rounded-2xl border border-black/5 bg-white/60 p-4 text-sm text-zinc-500 backdrop-blur dark:border-white/10 dark:bg-white/5">Belum ada bacaan contoh di basis data. Jalankan seed SKIBACA lebih dulu.</p>;
 
   if (aktif) {
     const terjawab = jawab.filter((x) => x != null).length;
     return (
       <div className="flex flex-col gap-4">
-        <button onClick={() => setAktif(null)} className="w-fit text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
+        <button onClick={() => setAktif(null)} className="w-fit text-xs font-semibold text-violet-600 hover:underline dark:text-violet-300">
           ← Daftar bacaan
         </button>
-        <article className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+        <article className="as-pop rounded-2xl border border-black/5 bg-white/60 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
           <h3 className="font-extrabold">{aktif.icon} {aktif.title}</h3>
           <p className="mt-0.5 text-[11px] text-zinc-500">{aktif.jurusanFull} · Level {aktif.level} · {aktif.wordCount} kata</p>
           <p className="mt-3 whitespace-pre-line text-sm leading-relaxed">{aktif.text}</p>
         </article>
         <div className="flex flex-col gap-3">
           {aktif.soal.map((s, qi) => (
-            <div key={s.urutan} className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+            <div key={s.urutan} className="as-pop rounded-2xl border border-black/5 bg-white/60 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
               <p className="text-sm font-semibold">{qi + 1}. {s.q}</p>
               <div className="mt-2 flex flex-col gap-1.5">
                 {s.options.map((o, oi) => {
@@ -296,7 +296,7 @@ function BacaPanel({ bacaan, catat }: { bacaan: SimBacaanKlien[]; catat: (s: Omi
                     <button
                       key={oi}
                       onClick={() => setJawab((j) => j.map((v, k) => (k === qi ? oi : v)))}
-                      className={"rounded-lg border px-3 py-1.5 text-left text-sm " + (on ? "border-blue-500 bg-blue-50 font-semibold dark:bg-blue-950/40" : "border-black/15 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10")}
+                      className={"rounded-lg border px-3 py-1.5 text-left text-sm transition-colors " + (on ? "border-amber-500 bg-amber-50 font-semibold dark:border-amber-500 dark:bg-amber-950/40" : "border-black/15 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10")}
                     >
                       {String.fromCharCode(65 + oi)}. {o}
                     </button>
@@ -418,7 +418,7 @@ function RunnerBerurut({
         <div className="h-full transition-all" style={{ width: `${(idx / total) * 100}%`, backgroundColor: warna }} />
       </div>
 
-      <div className="rounded-2xl border border-black/10 p-5 dark:border-white/15">
+      <div className="as-pop rounded-2xl border border-black/5 bg-white/60 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
         <div className="mb-2 flex items-center gap-2 text-sm text-zinc-500">
           <span>{cur.icon}</span>
           <span>{cur.topicName}</span>
@@ -436,7 +436,7 @@ function RunnerBerurut({
                 onClick={() => lanjut(o.key)}
                 className={
                   "rounded-lg border px-4 py-2.5 text-left transition-colors disabled:cursor-default " +
-                  (aktif ? "border-blue-600 bg-blue-50 dark:bg-blue-950/40" : "border-black/15 hover:border-blue-400 dark:border-white/20")
+                  (aktif ? "border-violet-600 bg-violet-50 dark:border-violet-500 dark:bg-violet-950/40" : "border-black/15 hover:border-violet-400 dark:border-white/20")
                 }
               >
                 <span className="mr-2 font-semibold">{String.fromCharCode(65 + i)}.</span>
@@ -456,7 +456,7 @@ function RunnerBerurut({
 function KartuHasil({ skor, ringkas }: { skor: number; ringkas: string }) {
   const warna = skor >= 75 ? "#16a34a" : skor >= 60 ? "#ca8a04" : "#dc2626";
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-zinc-900">
+    <div className="as-pop flex items-center gap-4 rounded-2xl border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900">
       <div className="text-3xl font-black tabular-nums" style={{ color: warna }}>{skor}</div>
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-bold">Hasil simulasi</p>

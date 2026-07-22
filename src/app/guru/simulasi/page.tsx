@@ -19,7 +19,7 @@ export default async function SimulasiPage() {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-5 py-10">
       <header>
         <div className="flex items-center gap-3">
-          <Link href="/guru" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+          <Link href="/guru" className="text-sm font-semibold text-violet-600 hover:underline dark:text-violet-300">
             ← Dasbor
           </Link>
           <h1 className="text-2xl font-bold">🧪 Simulasi Modul</h1>

@@ -10,6 +10,41 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-22 — Penyatuan tampilan Peringkat (siswa = guru = admin) — TUNTAS
+
+### ✅ Konteks
+- Permintaan user: **samakan tampilan** fitur yang muncul di siswa, guru, & admin — mulai dari
+  **Peringkat**. Sebelumnya siswa (ceria: hero gradien + kartu `as-pop`, TANPA podium) sangat beda
+  dari guru/admin (korporat: `rounded-xl border` biru + tabel + podium). Guru & admin sudah berbagi
+  `/guru/peringkat`, jadi intinya menyatukan **siswa ↔ guru/admin**.
+- Keputusan user: **desain bersama baru** (hero + podium sama di semua peran; guru/admin dapat
+  tambahan tabel/lingkup), dikerjakan **Peringkat dulu** sebagai pola/template.
+
+### ✅ Implementasi — komponen bersama baru `src/components/peringkat/`
+- **`hero.tsx`**: `Blobs` (latar blob) + `HeroPeringkat` (kartu gradien amber→orange→rose `as-pop`,
+  chip 3 kolom, emoji watermark) — bentuk/warna identik semua peran, isi beda via props.
+- **`podium.tsx`**: `Podium` (dipindah & digeneralkan dari `guru/peringkat/podium.tsx` yang DIHAPUS).
+  Prop `href?(r)` (guru → raport, siswa tanpa tautan) + `sayaId?` (tandai "kamu"). Restyle ke kartu
+  `as-pop rounded-3xl bg-white/70 backdrop-blur`. Aturan "tanpa medali nilai 0" tetap (return null bila kosong).
+- **`papan.tsx`**: `Papan` (kartu+judul+daftar) + `DaftarPapan` (hanya `<ol>`, dipakai ulang guru utk HP).
+- **Siswa** `siswa/peringkat/page.tsx`: pakai Blobs/HeroPeringkat/Podium/Papan; **kini punya Podium**
+  (dari `teratasSekolah`, sorot "kamu").
+- **Guru/admin** `guru/peringkat/page.tsx`: header polos biru → **Blobs + HeroPeringkat** ("Peringkat
+  Sekolah", chip siswa/kelas/nilai-teratas) + **Podium** bersama; semua section jadi `as-pop rounded-3xl`;
+  aksen **biru→violet**. `tabel.tsx`: HP pakai `DaftarPapan` bersama, layar lebar tabel rincian penuh
+  (tambahan guru: NISN/level/mutu/aktivitas). `filter.tsx` tab aktif biru→violet.
+
+### ✅ Verifikasi
+- `tsc` bersih, `eslint` bersih, **tes 117/117**.
+- **e2e live**: `/siswa/peringkat` (sesi Budi) — hero "Juara ke-1", **Podium** kolom emas tunggal
+  (hanya Budi nilai>0, degradasi benar), papan kelas/sekolah, nol error konsol. `/guru/peringkat`
+  (sesi guru Bambang) — hero "Peringkat Sekolah" (9 siswa/2 kelas/🥇30.5), filter, info rumus,
+  **Podium**, tabel detail 9 siswa utuh; lingkup **Antar Kelas** benar (X TKJ 1 #1=6.1). Nol error.
+- **BELUM di-commit.** Pola ini jadi template untuk menyamakan fitur bersama lain berikutnya
+  (dasbor beranda, modul SKIBA/SKIBACA).
+
+---
+
 ## 2026-07-22 — Podium Peringkat (import desain "Dashboard Guru.dc.html") — TUNTAS
 
 ### ✅ Konteks

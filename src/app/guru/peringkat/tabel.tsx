@@ -1,48 +1,23 @@
 import Link from "next/link";
 import { ikonJurusan } from "@/lib/kelas";
 import { medali, type BarisPeringkat } from "@/lib/peringkat";
+import { DaftarPapan } from "@/components/peringkat/papan";
 
 /**
  * Tabel peringkat siswa (dipakai lingkup sekolah & per kelas).
- * Di layar sempit (HP) tabel 7 kolom tak terbaca — di bawah `sm` berubah jadi kartu per siswa.
+ * HP: pakai papan bersama (identik dengan tampilan siswa). Layar lebar: tabel rincian penuh
+ * (tambahan khusus guru/admin — NISN, level/bacaan, mutu, aktivitas).
  */
 export default function TabelPeringkat({ rows, tampilkanKelas }: { rows: BarisPeringkat[]; tampilkanKelas: boolean }) {
+  const href = (r: BarisPeringkat) => `/guru/laporan/${r.siswaId}`;
   return (
     <>
-      {/* HP: kartu per siswa */}
-      <ul className="divide-y divide-black/5 sm:hidden dark:divide-white/5">
-        {rows.map((r) => (
-          <li key={r.siswaId} className="flex items-start gap-3 px-4 py-3">
-            <span className="w-9 shrink-0 pt-0.5 text-center font-black tabular-nums">
-              {medali(r.peringkat, r.nilai) || r.peringkat}
-            </span>
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/guru/laporan/${r.siswaId}`}
-                className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                {r.nama}
-              </Link>
-              <div className="text-xs text-zinc-400">
-                {r.nisn}
-                {tampilkanKelas && ` · ${ikonJurusan(r.kelasLabel)} ${r.kelasLabel}`}
-              </div>
-              <div className="mt-1 text-xs text-zinc-500">
-                🧮 {r.nilaiSkiba} <span className="text-zinc-400">({r.skibaLevel} lv · {r.skibaMutu ?? "—"}%)</span>
-                {" · "}
-                📖 {r.nilaiSkibaca}{" "}
-                <span className="text-zinc-400">({r.skibacaBacaan} bacaan · {r.skibacaMutu ?? "—"}%)</span>
-              </div>
-            </div>
-            <span className="shrink-0 text-right">
-              <span className="text-lg font-bold tabular-nums">{r.nilai}</span>
-              <span className="block text-[11px] text-zinc-400 tabular-nums">{r.aktivitas} aktivitas</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {/* HP: papan bersama */}
+      <div className="sm:hidden">
+        <DaftarPapan rows={rows} tampilkanKelas={tampilkanKelas} detail href={href} />
+      </div>
 
-      {/* Layar lebar: tabel penuh */}
+      {/* Layar lebar: tabel rincian penuh */}
       <div className="hidden overflow-x-auto sm:block">
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase tracking-wide text-zinc-500">
@@ -70,8 +45,8 @@ export default function TabelPeringkat({ rows, tampilkanKelas }: { rows: BarisPe
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   <Link
-                    href={`/guru/laporan/${r.siswaId}`}
-                    className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    href={href(r)}
+                    className="font-medium text-violet-600 hover:underline dark:text-violet-300"
                   >
                     {r.nama}
                   </Link>
