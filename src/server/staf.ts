@@ -86,6 +86,18 @@ export async function tambahAdmin(input: {
   return { ok: true };
 }
 
+/** Ubah nama satu akun guru/staf/admin. Hanya nama yang diubah (NIP/email/peran tetap). Hanya ADMIN. */
+export async function ubahNamaStaf(userId: string, nama: string): Promise<AksiResult> {
+  await requireAdmin();
+  const nm = (nama ?? "").trim().replace(/\s+/g, " ");
+  if (!nm) return { ok: false, error: "Nama wajib diisi." };
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!u) return { ok: false, error: "Akun tidak ditemukan." };
+  await prisma.user.update({ where: { id: userId }, data: { name: nm, updatedAt: new Date() } });
+  revalidatePath("/guru/staf");
+  return { ok: true };
+}
+
 /** Impor massal guru/staf dari .xlsx/.csv. Idempoten terhadap NIP (duplikat dilewati). */
 export async function imporStaf(formData: FormData): Promise<ImporStafLaporan> {
   await requireAdmin();

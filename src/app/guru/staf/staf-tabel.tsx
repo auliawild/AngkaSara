@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { hapusStaf, setelUlangSandiStaf, setKelasDinilai } from "@/server/staf";
+import { hapusStaf, setelUlangSandiStaf, setKelasDinilai, ubahNamaStaf } from "@/server/staf";
 import PilihKelas, { type OpsiKelas } from "./pilih-kelas";
 
 export interface BarisStafUI {
@@ -20,6 +20,8 @@ export default function StafTabel({ data, kelasOpsi }: { data: BarisStafUI[]; ke
   const [error, setError] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
+  const [editNamaId, setEditNamaId] = useState<string | null>(null);
+  const [namaDraft, setNamaDraft] = useState("");
 
   function hapus(s: BarisStafUI) {
     if (!confirm(`Hapus akun ${s.nama}? Tindakan ini tidak bisa dibatalkan.`)) return;
@@ -48,8 +50,35 @@ export default function StafTabel({ data, kelasOpsi }: { data: BarisStafUI[]; ke
   function bukaEditor(s: BarisStafUI) {
     setPesan(null);
     setError(null);
+    setEditNamaId(null);
     setEditId((cur) => (cur === s.id ? null : s.id));
     setDraft(s.kelasIds);
+  }
+
+  function bukaEditNama(s: BarisStafUI) {
+    setPesan(null);
+    setError(null);
+    setEditId(null);
+    setEditNamaId((cur) => (cur === s.id ? null : s.id));
+    setNamaDraft(s.nama);
+  }
+
+  function simpanNama(s: BarisStafUI) {
+    const nm = namaDraft.trim();
+    if (!nm) {
+      setError("Nama wajib diisi.");
+      return;
+    }
+    setPesan(null);
+    setError(null);
+    start(async () => {
+      const res = await ubahNamaStaf(s.id, nm);
+      if (res.ok) {
+        setPesan(`Nama ${s.nama} diperbarui.`);
+        setEditNamaId(null);
+        router.refresh();
+      } else setError(res.error ?? "Gagal menyimpan nama.");
+    });
   }
 
   function simpanKelas(s: BarisStafUI) {
@@ -121,6 +150,14 @@ export default function StafTabel({ data, kelasOpsi }: { data: BarisStafUI[]; ke
                     <td className="px-4 py-2 text-right">
                       <div className="flex justify-end gap-2">
                         <button
+                          onClick={() => bukaEditNama(s)}
+                          disabled={pending}
+                          className="rounded-md border border-black/15 px-2 py-1 text-xs hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
+                          title="Ubah nama"
+                        >
+                          ✏️ Edit nama
+                        </button>
+                        <button
                           onClick={() => bukaEditor(s)}
                           disabled={pending}
                           className="rounded-md border border-black/15 px-2 py-1 text-xs hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
@@ -148,6 +185,39 @@ export default function StafTabel({ data, kelasOpsi }: { data: BarisStafUI[]; ke
                       </div>
                     </td>
                   </tr>
+                  {editNamaId === s.id && (
+                    <tr className="border-b border-black/5 bg-black/[0.02] dark:border-white/5 dark:bg-white/[0.03]">
+                      <td colSpan={5} className="px-4 py-3">
+                        <label className="mb-1.5 block text-sm font-semibold">Ubah nama</label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            autoFocus
+                            value={namaDraft}
+                            onChange={(e) => setNamaDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") simpanNama(s);
+                              if (e.key === "Escape") setEditNamaId(null);
+                            }}
+                            placeholder="Nama lengkap"
+                            className="min-w-[14rem] flex-1 rounded-lg border border-black/15 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-violet-500 dark:border-white/20"
+                          />
+                          <button
+                            onClick={() => setEditNamaId(null)}
+                            className="rounded-md border border-black/15 px-2.5 py-1.5 text-xs hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            onClick={() => simpanNama(s)}
+                            disabled={pending || !namaDraft.trim()}
+                            className="rounded-md bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                          >
+                            {pending ? "Menyimpan…" : "Simpan"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {editId === s.id && (
                     <tr className="border-b border-black/5 bg-black/[0.02] dark:border-white/5 dark:bg-white/[0.03]">
                       <td colSpan={5} className="px-4 py-3">
