@@ -99,7 +99,7 @@ function SiswaForm({ next, router }: FormProps) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="text-sm font-medium" htmlFor="nisn">
-        NISN
+        UserName
       </label>
       <input
         id="nisn"
@@ -107,7 +107,7 @@ function SiswaForm({ next, router }: FormProps) {
         autoComplete="off"
         value={nisn}
         onChange={(e) => setNisn(e.target.value.replace(/\D/g, ""))}
-        placeholder="Masukkan NISN"
+        placeholder="Masukkan UserName"
         className="rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-violet-500 dark:border-white/20"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -118,7 +118,7 @@ function SiswaForm({ next, router }: FormProps) {
       >
         {loading ? "Memeriksa…" : "Masuk sebagai Siswa 🚀"}
       </button>
-      <p className="text-center text-xs text-zinc-400">Tanpa kata sandi — cukup NISN dari guru.</p>
+      <p className="text-center text-xs text-zinc-400">Tanpa kata sandi — cukup UserName dari guru.</p>
     </form>
   );
 }
