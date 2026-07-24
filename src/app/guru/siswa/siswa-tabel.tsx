@@ -34,7 +34,11 @@ export default function SiswaTabel({
   const [tambah, setTambah] = useState(false);
   const [pesan, setPesan] = useState<{ tipe: "ok" | "err"; teks: string } | null>(null);
 
-  function jalankan(fn: () => Promise<{ ok: boolean; error?: string }>, sukses: string, tutup: () => void) {
+  function jalankan(
+    fn: () => Promise<{ ok: boolean; error?: string; username?: string }>,
+    sukses: string | ((res: { ok: boolean; error?: string; username?: string }) => string),
+    tutup: () => void,
+  ) {
     setPesan(null);
     start(async () => {
       const res = await fn();
@@ -43,7 +47,7 @@ export default function SiswaTabel({
         return;
       }
       tutup();
-      setPesan({ tipe: "ok", teks: sukses });
+      setPesan({ tipe: "ok", teks: typeof sukses === "function" ? sukses(res) : sukses });
       router.refresh();
     });
   }
@@ -54,16 +58,38 @@ export default function SiswaTabel({
         <h2 className="font-semibold">
           {kelas.label} <span className="text-sm font-normal text-zinc-500">· {siswa.length} siswa</span>
         </h2>
-        <button
-          onClick={() => {
-            setTambah((v) => !v);
-            setEditId(null);
-            setPesan(null);
-          }}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {tambah ? "Batal" : "+ Tambah siswa"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/guru/siswa/export?kelas=${kelas.id}&format=xlsx`}
+            className={
+              "rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10 " +
+              (siswa.length === 0 ? "pointer-events-none opacity-40" : "")
+            }
+            title="Unduh daftar siswa + UserName (Excel)"
+          >
+            ⬇️ Excel
+          </a>
+          <a
+            href={`/guru/siswa/export?kelas=${kelas.id}&format=csv`}
+            className={
+              "rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10 " +
+              (siswa.length === 0 ? "pointer-events-none opacity-40" : "")
+            }
+            title="Unduh daftar siswa + UserName (CSV)"
+          >
+            ⬇️ CSV
+          </a>
+          <button
+            onClick={() => {
+              setTambah((v) => !v);
+              setEditId(null);
+              setPesan(null);
+            }}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {tambah ? "Batal" : "+ Tambah siswa"}
+          </button>
+        </div>
       </div>
 
       {pesan && (
@@ -81,8 +107,15 @@ export default function SiswaTabel({
           kelasOpsi={kelasOpsi}
           awal={{ nisn: "", nama: "", kelasId: kelas.id, aktif: true }}
           pending={pending}
+          autoUsername
           onBatal={() => setTambah(false)}
-          onSimpan={(d, tutup) => jalankan(() => tambahSiswa(d), "Siswa ditambahkan.", tutup)}
+          onSimpan={(d, tutup) =>
+            jalankan(
+              () => tambahSiswa(d),
+              (res) => (res.username ? `Siswa ditambahkan. UserName: ${res.username}` : "Siswa ditambahkan."),
+              tutup,
+            )
+          }
         />
       )}
 
@@ -168,6 +201,7 @@ function BarisForm({
   awal,
   pending,
   withAktif,
+  autoUsername,
   onBatal,
   onSimpan,
 }: {
@@ -175,6 +209,8 @@ function BarisForm({
   awal: { nisn: string; nama: string; kelasId: string; aktif: boolean };
   pending: boolean;
   withAktif?: boolean;
+  /** Form tambah: UserName boleh dikosongkan → dibuat otomatis oleh server. */
+  autoUsername?: boolean;
   onBatal: () => void;
   onSimpan: (d: { nisn: string; nama: string; kelasId: string; aktif: boolean }, tutup: () => void) => void;
 }) {
@@ -183,11 +219,14 @@ function BarisForm({
   const [kelasId, setKelasId] = useState(awal.kelasId);
   const [aktif, setAktif] = useState(awal.aktif);
 
+  // Boleh kosong bila auto; kalau diisi tetap harus ≥4 digit.
+  const nisnTakSah = autoUsername ? nisn.length > 0 && nisn.length < 4 : nisn.length < 4;
+
   return (
     <div className="flex flex-wrap items-center gap-2 bg-black/[.02] px-4 py-3 dark:bg-white/[.03]">
       <input
-        className={inputCls + " w-36 font-mono"}
-        placeholder="NISN"
+        className={inputCls + " w-44 font-mono"}
+        placeholder={autoUsername ? "UserName (otomatis)" : "NISN"}
         inputMode="numeric"
         value={nisn}
         onChange={(e) => setNisn(e.target.value.replace(/\D/g, ""))}
@@ -212,7 +251,7 @@ function BarisForm({
         </label>
       )}
       <button
-        disabled={pending || nisn.length < 4 || !nama.trim()}
+        disabled={pending || nisnTakSah || !nama.trim()}
         onClick={() => onSimpan({ nisn, nama, kelasId, aktif }, onBatal)}
         className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
       >
@@ -224,6 +263,12 @@ function BarisForm({
       >
         Batal
       </button>
+      {autoUsername && (
+        <p className="w-full text-xs text-zinc-500">
+          Cukup isi <b>Nama</b> &amp; pilih <b>Kelas</b> — UserName dibuat otomatis (angkatan+jurusan+rombel+urutan).
+          Isi kotak UserName hanya jika siswa sudah punya NISN.
+        </p>
+      )}
     </div>
   );
 }

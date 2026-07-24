@@ -11,6 +11,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseSiswa } from "@/lib/excel";
 import { hitungImpor, NISN_RE, type ImporLaporan } from "@/lib/impor";
+import type { Tingkat } from "@/lib/kelas";
+import { prefixUsername, buatUsername, urutanBerikut } from "@/lib/username";
 
 async function requireStaf(): Promise<void> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -20,6 +22,8 @@ async function requireStaf(): Promise<void> {
 export interface AksiResult {
   ok: boolean;
   error?: string;
+  /** Diisi tambahSiswa saat UserName dibuat otomatis, agar UI bisa menampilkannya. */
+  username?: string;
 }
 
 /** Impor massal dari berkas .xlsx/.csv. Idempoten terhadap NISN (duplikat dilewati). */
@@ -46,21 +50,54 @@ export async function imporSiswa(formData: FormData): Promise<ImporLaporan> {
   return laporan;
 }
 
-/** Tambah satu siswa. */
+/**
+ * Tambah satu siswa. Bila `nisn` dikosongkan, UserName 8-digit dibuat OTOMATIS dari kelas
+ * ([angkatan][jurusan][rombel][urutan]); lihat [[username]]. Bila diisi, dipakai apa adanya
+ * (untuk siswa yang memang punya NISN).
+ */
 export async function tambahSiswa(input: { nisn: string; nama: string; kelasId: string }): Promise<AksiResult> {
   await requireStaf();
-  const nisn = input.nisn.trim();
+  let nisn = input.nisn.trim();
   const nama = input.nama.trim().replace(/\s+/g, " ");
-  if (!NISN_RE.test(nisn)) return { ok: false, error: "NISN harus 4–15 digit angka." };
   if (!nama) return { ok: false, error: "Nama wajib diisi." };
-  const kelas = await prisma.kelas.findUnique({ where: { id: input.kelasId }, select: { id: true } });
+
+  const kelas = await prisma.kelas.findUnique({
+    where: { id: input.kelasId },
+    select: { id: true, tingkat: true, rombel: true, jurusan: { select: { kode: true } } },
+  });
   if (!kelas) return { ok: false, error: "Kelas tidak valid." };
-  if (await prisma.student.findUnique({ where: { nisn }, select: { id: true } }))
-    return { ok: false, error: "NISN sudah terdaftar." };
+
+  let dibuatOtomatis = false;
+  if (!nisn) {
+    // Auto-generate UserName dari kelas + nomor urut berikutnya.
+    const prefix = prefixUsername(kelas.tingkat as Tingkat, kelas.jurusan.kode, kelas.rombel);
+    if (!prefix) return { ok: false, error: "Kelas ini tidak bisa dibuatkan UserName otomatis." };
+    const adaNisn = (
+      await prisma.student.findMany({ where: { kelasId: kelas.id }, select: { nisn: true } })
+    ).map((s) => s.nisn);
+    // Cari nomor bebas: mulai dari urutan berikutnya, naikkan bila bentrok (NISN nyata / balapan).
+    let urut = urutanBerikut(prefix, adaNisn);
+    let terpakai = true;
+    for (let i = 0; i < 500 && terpakai; i++) {
+      const kandidat = buatUsername(prefix, urut);
+      const bentrok = await prisma.student.findUnique({ where: { nisn: kandidat }, select: { id: true } });
+      if (bentrok) urut++;
+      else {
+        nisn = kandidat;
+        terpakai = false;
+      }
+    }
+    if (terpakai) return { ok: false, error: "Gagal membuat UserName unik untuk kelas ini." };
+    dibuatOtomatis = true;
+  } else {
+    if (!NISN_RE.test(nisn)) return { ok: false, error: "UserName/NISN harus 4–15 digit angka." };
+    if (await prisma.student.findUnique({ where: { nisn }, select: { id: true } }))
+      return { ok: false, error: "UserName/NISN sudah terdaftar." };
+  }
 
   await prisma.student.create({ data: { nisn, nama, kelasId: input.kelasId } });
   revalidatePath("/guru/siswa");
-  return { ok: true };
+  return { ok: true, username: dibuatOtomatis ? nisn : undefined };
 }
 
 /** Ubah data siswa (NISN/nama/kelas/aktif). */
