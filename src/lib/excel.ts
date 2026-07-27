@@ -2,10 +2,10 @@
  * Impor & template siswa via Excel/CSV — dipakai server action `imporSiswa`
  * dan route unduh template `/guru/siswa/template`. Node runtime saja (exceljs).
  *
- * Format yang diterima: satu lembar dengan kolom NISN, Nama, Kelas (judul kolom
- * dicari otomatis dalam 8 baris pertama; boleh urut apa saja). Bila tak ada baris
- * judul, diasumsikan kolom A=NISN, B=Nama, C=Kelas. Validasi/normalisasi kelas &
- * keunikan NISN dilakukan di server action, BUKAN di sini (lib ini murni baca/tulis).
+ * Format yang diterima: satu lembar dengan kolom Nama & Kelas (judul kolom dicari
+ * otomatis dalam 8 baris pertama; boleh urut apa saja). Kolom NISN/UserName opsional.
+ * Bila tak ada baris judul, diasumsikan A=Nama, B=Kelas. Validasi/normalisasi kelas &
+ * pembuatan UserName otomatis dilakukan di server action, BUKAN di sini (lib ini murni baca/tulis).
  */
 import ExcelJS from "exceljs";
 import { semuaKelas, SISWA_PER_KELAS } from "./kelas";
@@ -115,7 +115,11 @@ function pecahBaris(baris: string, sep: string): string[] {
   return out.map((s) => s.trim());
 }
 
-/** Cari baris judul (NISN/Nama/Kelas) → petakan kolom; jika tak ada, asumsi A/B/C. */
+/**
+ * Cari baris judul: yang WAJIB hanya Nama & Kelas (UserName dibuat otomatis).
+ * Kolom NISN/UserName bersifat opsional — kalau ada & terisi, dipakai sbagai UserName.
+ * Jika tak ada baris judul, diasumsikan A=Nama, B=Kelas.
+ */
 function mapRows(rows: { r: number; cells: string[] }[]): BarisSiswa[] {
   let headerIdx = -1;
   let colNisn = -1;
@@ -123,28 +127,27 @@ function mapRows(rows: { r: number; cells: string[] }[]): BarisSiswa[] {
   let colKelas = -1;
   for (let i = 0; i < Math.min(rows.length, 8); i++) {
     const cells = rows[i].cells.map((c) => (c || "").toLowerCase().trim());
-    const iN = cells.findIndex((c) => c.includes("nisn"));
     const iNa = cells.findIndex((c) => c.includes("nama") || c === "name");
     const iK = cells.findIndex((c) => c.includes("kelas"));
-    if (iN >= 0 && iNa >= 0 && iK >= 0) {
+    if (iNa >= 0 && iK >= 0) {
       headerIdx = i;
-      colNisn = iN;
       colNama = iNa;
       colKelas = iK;
+      colNisn = cells.findIndex((c) => c.includes("nisn") || c.includes("username") || c.includes("user name"));
       break;
     }
   }
   if (headerIdx < 0) {
-    // tanpa judul: A=NISN, B=Nama, C=Kelas
-    colNisn = 0;
-    colNama = 1;
-    colKelas = 2;
+    // tanpa judul: A=Nama, B=Kelas (UserName otomatis, tak ada kolom NISN)
+    colNama = 0;
+    colKelas = 1;
+    colNisn = -1;
   }
   const out: BarisSiswa[] = [];
   const start = headerIdx < 0 ? 0 : headerIdx + 1;
   for (let i = start; i < rows.length; i++) {
     const { r, cells } = rows[i];
-    const nisn = (cells[colNisn] || "").trim();
+    const nisn = colNisn >= 0 ? (cells[colNisn] || "").trim() : "";
     const nama = (cells[colNama] || "").replace(/\s+/g, " ").trim();
     const kelas = (cells[colKelas] || "").trim();
     if (!nisn && !nama && !kelas) continue; // baris kosong
@@ -156,9 +159,9 @@ function mapRows(rows: { r: number; cells: string[] }[]): BarisSiswa[] {
 /* ============================ TULIS (template) ============================ */
 
 /**
- * Template kosong siap isi: header NISN|Nama|Kelas, lalu 46 kelas × 40 baris
- * dengan kolom Kelas terisi (guru tinggal mengisi NISN & Nama). Kolom NISN
- * diformat teks agar angka berawalan nol tidak hilang.
+ * Template kosong siap isi: header Nama|Kelas, lalu 46 kelas × 40 baris dengan
+ * kolom Kelas terisi. Guru cukup mengisi Nama — UserName login dibuat otomatis
+ * setelah impor (lihat [[username]]).
  */
 export async function templateSiswa(): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
@@ -167,11 +170,9 @@ export async function templateSiswa(): Promise<ArrayBuffer> {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   ws.columns = [
-    { header: "NISN", key: "nisn", width: 18 },
     { header: "Nama", key: "nama", width: 34 },
     { header: "Kelas", key: "kelas", width: 14 },
   ];
-  ws.getColumn(1).numFmt = "@"; // teks — jaga nol di depan NISN
 
   const head = ws.getRow(1);
   head.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -181,7 +182,7 @@ export async function templateSiswa(): Promise<ArrayBuffer> {
 
   for (const kelas of semuaKelas()) {
     for (let i = 0; i < SISWA_PER_KELAS; i++) {
-      ws.addRow({ nisn: "", nama: "", kelas });
+      ws.addRow({ nama: "", kelas });
     }
   }
   // exceljs mengembalikan Buffer Node; cukup untuk Response.

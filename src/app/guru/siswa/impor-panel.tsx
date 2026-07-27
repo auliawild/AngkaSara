@@ -42,7 +42,8 @@ export default function ImporPanel() {
         <div>
           <h2 className="font-semibold text-blue-900 dark:text-blue-200">📊 Impor dari Excel</h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-            Kolom <b>NISN</b>, <b>Nama</b>, <b>Kelas</b>. Duplikat NISN otomatis dilewati.
+            Cukup kolom <b>Nama</b> &amp; <b>Kelas</b> — <b>UserName</b> login dibuat otomatis setelah impor.
+            Nama yang sudah ada di kelas itu dilewati.
           </p>
         </div>
         <a
@@ -83,7 +84,7 @@ export default function ImporPanel() {
         <div className="mt-4 space-y-2 text-sm">
           <p className="font-medium text-green-700 dark:text-green-400">
             ✅ {lapor.ditambah} siswa ditambahkan
-            {lapor.dilewati.length > 0 && ` · ${lapor.dilewati.length} dilewati (NISN sudah ada)`}
+            {lapor.dilewati.length > 0 && ` · ${lapor.dilewati.length} dilewati (sudah ada)`}
             {lapor.gagal.length > 0 && ` · ${lapor.gagal.length} gagal`}
           </p>
 
@@ -93,6 +94,27 @@ export default function ImporPanel() {
                 .map(([k, n]) => `${k}: ${n}`)
                 .join(" · ")}
             </p>
+          )}
+
+          {lapor.dibuat.length > 0 && (
+            <details className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/30">
+              <summary className="cursor-pointer font-medium text-green-800 dark:text-green-300">
+                {lapor.dibuat.length} UserName dibuat otomatis — klik untuk lihat
+              </summary>
+              <ul className="mt-2 max-h-48 space-y-0.5 overflow-y-auto text-zinc-700 dark:text-zinc-200">
+                {lapor.dibuat.map((d, i) => (
+                  <li key={i} className="flex justify-between gap-3">
+                    <span className="truncate">
+                      {d.nama} <span className="text-zinc-400">· {d.kelas}</span>
+                    </span>
+                    <span className="font-mono font-semibold">{d.username}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-zinc-500">
+                Unduh daftar lengkap + UserName lewat tombol ⬇️ Excel/CSV di tiap kelas.
+              </p>
+            </details>
           )}
 
           {lapor.gagal.length > 0 && (

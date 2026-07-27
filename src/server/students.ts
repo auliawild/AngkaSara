@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseSiswa } from "@/lib/excel";
-import { hitungImpor, NISN_RE, type ImporLaporan } from "@/lib/impor";
+import { hitungImpor, NISN_RE, type ImporLaporan, type KelasImpor } from "@/lib/impor";
 import type { Tingkat } from "@/lib/kelas";
 import { prefixUsername, buatUsername, urutanBerikut } from "@/lib/username";
 
@@ -36,11 +36,17 @@ export async function imporSiswa(formData: FormData): Promise<ImporLaporan> {
   if (baris.length === 0) throw new Error("Berkas tidak berisi data siswa.");
 
   // Hanya kelas AKTIF yang boleh menerima impor (kelas nonaktif ditolak, lihat hitungImpor).
-  const kelasRows = await prisma.kelas.findMany({ where: { aktif: true }, select: { id: true, label: true } });
-  const kelasByLabel = new Map(kelasRows.map((k) => [k.label, k.id]));
-  const existing = new Set(
-    (await prisma.student.findMany({ select: { nisn: true } })).map((s) => s.nisn),
+  const kelasRows = await prisma.kelas.findMany({
+    where: { aktif: true },
+    select: { id: true, label: true, tingkat: true, rombel: true, jurusan: { select: { kode: true } } },
+  });
+  const kelasByLabel = new Map<string, KelasImpor>(
+    kelasRows.map((k) => [
+      k.label,
+      { id: k.id, tingkat: k.tingkat as Tingkat, jurusanKode: k.jurusan.kode, rombel: k.rombel },
+    ]),
   );
+  const existing = await prisma.student.findMany({ select: { nisn: true, nama: true, kelasId: true } });
 
   const { laporan, toAdd } = hitungImpor(baris, kelasByLabel, existing);
   if (toAdd.length) {
