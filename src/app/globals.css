@@ -57,6 +57,32 @@ body {
   .as-lift { transition: none; }
 }
 
+/* ===== Pecahan (soal Numerasi SKIBA & Check Point, disuntik via fracHTML) ===== */
+/* fracHTML() memasang <span class="fraction"><span class="num">n</span><span class="den">d</span></span>.
+   Tanpa aturan ini num & den tampil berdampingan ("34") — ambigu, sering salah baca di HP.
+   Dirender sebagai pecahan tumpuk (pembilang di atas garis, penyebut di bawah). Ukuran em →
+   ikut font sekitarnya; currentColor → ikut warna teks tombol/opsi (terang & gelap). */
+.fraction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1.05;
+  margin: 0 0.22em;
+  text-align: center;
+  white-space: nowrap;
+}
+.fraction .num {
+  display: block;
+  padding: 0 0.4em 0.06em;
+}
+.fraction .den {
+  display: block;
+  padding: 0.06em 0.4em 0;
+  border-top: 0.09em solid currentColor;
+}
+
 /* ===== Cetak (raport & progres) ===== */
 /* Lembar A4: tampil sebagai halaman berukuran A4 baik di layar maupun saat dicetak. */
 .cetak-lembar {
