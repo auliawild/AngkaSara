@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { urutkanKelas, ikonJurusan } from "@/lib/kelas";
+import { urutkanKelas, ikonJurusan, periodKey, BULAN_PANJANG } from "@/lib/kelas";
+import { MAX_DIAG_ATTEMPTS } from "@/lib/skiba";
 import SiswaTabel from "./siswa-tabel";
 import ImporPanel from "./impor-panel";
 
@@ -31,13 +32,42 @@ export default async function KelolaSiswaPage({
     sp.kelas && kelasList.some((k) => k.id === sp.kelas) ? sp.kelas : kelasList[0]?.id;
   const selected = kelasList.find((k) => k.id === selectedId) ?? null;
 
-  const siswa = selectedId
+  const siswaRows = selectedId
     ? await prisma.student.findMany({
         where: { kelasId: selectedId },
         orderBy: { nama: "asc" },
-        select: { id: true, nisn: true, nama: true, aktif: true, kelasId: true },
+        select: {
+          id: true,
+          nisn: true,
+          nama: true,
+          aktif: true,
+          kelasId: true,
+          skibaProfile: { select: { diagAttempts: true } },
+        },
       })
     : [];
+
+  // Status Check Point periode berjalan untuk siswa kelas terpilih (buka-kesempatan).
+  const period = periodKey();
+  const cpRows = siswaRows.length
+    ? await prisma.checkpointResult.findMany({
+        where: { studentId: { in: siswaRows.map((s) => s.id) }, period },
+        select: { studentId: true, status: true },
+      })
+    : [];
+  const cpByStudent = new Map(cpRows.map((r) => [r.studentId, r.status]));
+  const [thP, blP] = period.split("-").map(Number);
+  const periodeLabel = `${BULAN_PANJANG[(blP ?? 1) - 1] ?? ""} ${thP ?? ""}`.trim();
+
+  const siswa = siswaRows.map((s) => ({
+    id: s.id,
+    nisn: s.nisn,
+    nama: s.nama,
+    aktif: s.aktif,
+    kelasId: s.kelasId,
+    diagTerpakai: s.skibaProfile?.diagAttempts ?? 0,
+    cpStatus: (cpByStudent.get(s.id) ?? null) as "in_progress" | "submitted" | null,
+  }));
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
@@ -97,7 +127,13 @@ export default async function KelolaSiswaPage({
 
         {/* Tabel siswa kelas terpilih */}
         {selected ? (
-          <SiswaTabel kelas={{ id: selected.id, label: selected.label }} siswa={siswa} kelasOpsi={kelasOpsi} />
+          <SiswaTabel
+            kelas={{ id: selected.id, label: selected.label }}
+            siswa={siswa}
+            kelasOpsi={kelasOpsi}
+            diagMaks={MAX_DIAG_ATTEMPTS}
+            periodeLabel={periodeLabel}
+          />
         ) : (
           <p className="text-sm text-zinc-500">Belum ada kelas. Jalankan seed terlebih dahulu.</p>
         )}

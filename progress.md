@@ -10,6 +10,39 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-07-29 — Admin buka kembali kesempatan (Diagnostik SKIBA & Check Point) — TUNTAS (BELUM commit)
+
+### ✅ Konteks
+- Permintaan user: siswa yang **kehilangan kesempatan karena kendala (mis. sinyal putus)** harus bisa
+  ditolong admin. Dua batas: **Tes Diagnostik SKIBA Math** (maks 2× via `SkibaProfile.diagAttempts`)
+  dan **Check Point** (1×/bulan via `@@unique[studentId, period]`). Admin bisa **membuka kembali** keduanya.
+
+### ✅ Implementasi (tanpa perubahan skema)
+- **`src/server/kesempatan.ts`** (BARU, ADMIN-only via `requireAdmin`):
+  - `bukaDiagnostikSkiba(studentId)` → `SkibaProfile.diagAttempts = 0` (kuota penuh 2× kembali; `diagScore`/`diagAt`
+    baseline raport TIDAK disentuh, tertimpa saat kerjakan ulang). No-op ramah bila belum terpakai.
+  - `bukaCheckpoint(studentId)` → `deleteMany` `CheckpointResult` **periode berjalan** (`periodKey()`). Check Point
+    hanya menulis ke `CheckpointResult` (bukan `PracticeActivity`) → hapus = reset bersih; seed bulanan sama saat
+    mulai ulang. No-op ramah bila belum ada.
+- **`/guru/siswa/page.tsx`**: query siswa kelas terpilih kini sertakan `skibaProfile.diagAttempts` + ambil
+  `CheckpointResult` periode berjalan (map by studentId) → teruskan `diagTerpakai` & `cpStatus` per siswa,
+  plus prop `diagMaks` (`MAX_DIAG_ATTEMPTS`) & `periodeLabel` ("Juli 2026").
+- **`siswa-tabel.tsx`**: aksi baru **🔓 Kesempatan** per baris (toggle `bukaId`, pola seperti Edit) membuka
+  `PanelKesempatan` — 2 kartu (🧮 Diagnostik SKIBA: "terpakai X/2" + tombol Buka kembali, aktif bila >0; 📝 Check
+  Point {bulan}: status belum/sedang/sudah + tombol Buka kembali + confirm, aktif bila ada baris). `jalankan`
+  digeneralkan menerima `pesan?`. Sukses → panel tutup + `router.refresh()` (status termutakhir).
+
+### ✅ Verifikasi
+- `next build` sukses (TypeScript **116s bersih**, 27 rute — `/guru/siswa` terdaftar), **tes 124/124**.
+- Jalur DB nyata (skrip tsx read/restore): `diagAttempts` 2→0 lalu dipulihkan; `CheckpointResult` periode
+  berjalan siswa uji = 1 baris (target `deleteMany` benar). Catatan: tsc mentah sempat error HANYA di
+  `.next/dev/types/validator.ts` (artefak stale crash) — dibersihkan; build TS authoritative bersih.
+- **UI e2e saat login ADMIN BELUM** (larangan ketik password) — `/guru/siswa` admin-only. **User perlu cek
+  visual sekali**: buka Kelola Siswa → baris siswa → 🔓 Kesempatan → Buka kembali.
+- **BELUM di-commit** (di atas `4b3ff80`).
+
+---
+
 ## 2026-07-22 — Penyatuan tampilan Peringkat (siswa = guru = admin) — TUNTAS
 
 ### ✅ Konteks

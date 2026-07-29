@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { tambahSiswa, editSiswa, hapusSiswa } from "@/server/students";
+import { bukaDiagnostikSkiba, bukaCheckpoint } from "@/server/kesempatan";
 
 interface Row {
   id: string;
@@ -10,6 +11,10 @@ interface Row {
   nama: string;
   aktif: boolean;
   kelasId: string;
+  /** Jumlah kesempatan Tes Diagnostik SKIBA yang sudah dipakai (0..diagMaks). */
+  diagTerpakai: number;
+  /** Status Check Point periode berjalan: null = belum ada. */
+  cpStatus: "in_progress" | "submitted" | null;
 }
 interface Opsi {
   id: string;
@@ -23,20 +28,27 @@ export default function SiswaTabel({
   kelas,
   siswa,
   kelasOpsi,
+  diagMaks,
+  periodeLabel,
 }: {
   kelas: Opsi;
   siswa: Row[];
   kelasOpsi: Opsi[];
+  diagMaks: number;
+  periodeLabel: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [editId, setEditId] = useState<string | null>(null);
+  const [bukaId, setBukaId] = useState<string | null>(null);
   const [tambah, setTambah] = useState(false);
   const [pesan, setPesan] = useState<{ tipe: "ok" | "err"; teks: string } | null>(null);
 
   function jalankan(
-    fn: () => Promise<{ ok: boolean; error?: string; username?: string }>,
-    sukses: string | ((res: { ok: boolean; error?: string; username?: string }) => string),
+    fn: () => Promise<{ ok: boolean; error?: string; username?: string; pesan?: string }>,
+    sukses:
+      | string
+      | ((res: { ok: boolean; error?: string; username?: string; pesan?: string }) => string),
     tutup: () => void,
   ) {
     setPesan(null);
@@ -152,40 +164,86 @@ export default function SiswaTabel({
                     </td>
                   </tr>
                 ) : (
-                  <tr key={s.id} className="border-b border-black/5 hover:bg-black/[.02] dark:border-white/5 dark:hover:bg-white/[.03]">
-                    <td className="px-4 py-2 font-mono text-xs">{s.nisn}</td>
-                    <td className="px-4 py-2">{s.nama}</td>
-                    <td className="px-4 py-2">
-                      {s.aktif ? (
-                        <span className="text-green-600">Aktif</span>
-                      ) : (
-                        <span className="text-zinc-400">Nonaktif</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => {
-                          setEditId(s.id);
-                          setTambah(false);
-                          setPesan(null);
-                        }}
-                        className="rounded px-2 py-1 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        disabled={pending}
-                        onClick={() => {
-                          if (!confirm(`Hapus ${s.nama} (NISN ${s.nisn})? Data Check Point-nya ikut terhapus.`))
-                            return;
-                          jalankan(() => hapusSiswa(s.id), "Siswa dihapus.", () => {});
-                        }}
-                        className="rounded px-2 py-1 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
-                      >
-                        Hapus
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={s.id}>
+                    <tr className="border-b border-black/5 hover:bg-black/[.02] dark:border-white/5 dark:hover:bg-white/[.03]">
+                      <td className="px-4 py-2 font-mono text-xs">{s.nisn}</td>
+                      <td className="px-4 py-2">{s.nama}</td>
+                      <td className="px-4 py-2">
+                        {s.aktif ? (
+                          <span className="text-green-600">Aktif</span>
+                        ) : (
+                          <span className="text-zinc-400">Nonaktif</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            setBukaId((v) => (v === s.id ? null : s.id));
+                            setEditId(null);
+                            setTambah(false);
+                            setPesan(null);
+                          }}
+                          className={
+                            "rounded px-2 py-1 hover:bg-amber-50 dark:hover:bg-amber-950 " +
+                            (bukaId === s.id
+                              ? "text-amber-700 dark:text-amber-300"
+                              : "text-amber-600 dark:text-amber-400")
+                          }
+                          title="Buka kembali kesempatan Diagnostik / Check Point"
+                        >
+                          🔓 Kesempatan
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditId(s.id);
+                            setBukaId(null);
+                            setTambah(false);
+                            setPesan(null);
+                          }}
+                          className="rounded px-2 py-1 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          disabled={pending}
+                          onClick={() => {
+                            if (!confirm(`Hapus ${s.nama} (NISN ${s.nisn})? Data Check Point-nya ikut terhapus.`))
+                              return;
+                            jalankan(() => hapusSiswa(s.id), "Siswa dihapus.", () => {});
+                          }}
+                          className="rounded px-2 py-1 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                    {bukaId === s.id && (
+                      <tr className="border-b border-black/5 dark:border-white/5">
+                        <td colSpan={4} className="p-0">
+                          <PanelKesempatan
+                            row={s}
+                            diagMaks={diagMaks}
+                            periodeLabel={periodeLabel}
+                            pending={pending}
+                            onBukaDiag={() =>
+                              jalankan(
+                                () => bukaDiagnostikSkiba(s.id),
+                                (res) => res.pesan ?? "Kesempatan diagnostik dibuka.",
+                                () => setBukaId(null),
+                              )
+                            }
+                            onBukaCheckpoint={() =>
+                              jalankan(
+                                () => bukaCheckpoint(s.id),
+                                (res) => res.pesan ?? "Kesempatan Check Point dibuka.",
+                                () => setBukaId(null),
+                              )
+                            }
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ),
               )}
             </tbody>
@@ -269,6 +327,85 @@ function BarisForm({
           Isi kotak UserName hanya jika siswa sudah punya NISN.
         </p>
       )}
+    </div>
+  );
+}
+
+/** Panel buka-kesempatan per siswa: Tes Diagnostik SKIBA & Check Point periode berjalan. */
+function PanelKesempatan({
+  row,
+  diagMaks,
+  periodeLabel,
+  pending,
+  onBukaDiag,
+  onBukaCheckpoint,
+}: {
+  row: Row;
+  diagMaks: number;
+  periodeLabel: string;
+  pending: boolean;
+  onBukaDiag: () => void;
+  onBukaCheckpoint: () => void;
+}) {
+  const diagHabis = row.diagTerpakai > 0;
+  const cpAda = row.cpStatus !== null;
+  const cpTeks =
+    row.cpStatus === "submitted"
+      ? "sudah dikumpulkan"
+      : row.cpStatus === "in_progress"
+        ? "sedang dikerjakan"
+        : "belum dikerjakan";
+
+  const tombolCls =
+    "rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
+
+  return (
+    <div className="grid gap-3 bg-amber-50/60 px-4 py-3 sm:grid-cols-2 dark:bg-amber-950/20">
+      {/* Tes Diagnostik SKIBA */}
+      <div className="flex flex-col gap-1.5 rounded-lg border border-amber-200/60 p-3 dark:border-amber-900/40">
+        <div className="text-sm font-semibold">🧮 Tes Diagnostik SKIBA</div>
+        <div className="text-xs text-zinc-600 dark:text-zinc-400">
+          Terpakai <b>{row.diagTerpakai}</b> dari {diagMaks}× ·{" "}
+          {diagHabis ? (
+            <span className="text-amber-700 dark:text-amber-300">bisa dibuka kembali</span>
+          ) : (
+            <span className="text-green-600">kesempatan masih penuh</span>
+          )}
+        </div>
+        <div>
+          <button disabled={pending || !diagHabis} onClick={onBukaDiag} className={tombolCls}>
+            {pending ? "Memproses…" : "Buka kembali"}
+          </button>
+        </div>
+        <p className="text-[11px] text-zinc-500">Kuota dikembalikan penuh ({diagMaks}×). Skor lama tetap.</p>
+      </div>
+
+      {/* Check Point periode berjalan */}
+      <div className="flex flex-col gap-1.5 rounded-lg border border-amber-200/60 p-3 dark:border-amber-900/40">
+        <div className="text-sm font-semibold">📝 Check Point {periodeLabel}</div>
+        <div className="text-xs text-zinc-600 dark:text-zinc-400">
+          Status:{" "}
+          <b className={cpAda ? "text-amber-700 dark:text-amber-300" : "text-green-600"}>{cpTeks}</b>
+        </div>
+        <div>
+          <button
+            disabled={pending || !cpAda}
+            onClick={() => {
+              if (
+                !confirm(
+                  `Buka kembali Check Point ${periodeLabel} untuk ${row.nama}? Skor bulan ini yang tersimpan akan dihapus.`,
+                )
+              )
+                return;
+              onBukaCheckpoint();
+            }}
+            className={tombolCls}
+          >
+            {pending ? "Memproses…" : "Buka kembali"}
+          </button>
+        </div>
+        <p className="text-[11px] text-zinc-500">Menghapus hasil bulan ini agar siswa bisa mulai dari awal.</p>
+      </div>
     </div>
   );
 }
