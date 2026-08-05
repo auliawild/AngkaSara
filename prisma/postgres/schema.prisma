@@ -53,6 +53,7 @@ model Student {
   kelasId     String
   aktif       Boolean            @default(true)
   createdAt   DateTime           @default(now())
+  lastSeen    DateTime? // detak kehadiran siswa (heartbeat) untuk status online di Pantauan guru
   activities  PracticeActivity[]
   checkpoints CheckpointResult[]
   skibaTopics SkibaTopicState[]

@@ -62,6 +62,14 @@ const MODUL: Modul[] = [
     shadow: "0 16px 34px -20px rgba(13,148,136,.5)",
   },
   {
+    href: "/guru/pantau",
+    emoji: "🟢",
+    title: "Pantauan Harian",
+    desc: "Siswa online real-time, kegiatan hari ini, level & riwayat per siswa.",
+    grad: "linear-gradient(135deg,#22c55e,#0d9488)",
+    shadow: "0 16px 34px -20px rgba(16,185,129,.5)",
+  },
+  {
     href: "/guru/laporan",
     emoji: "📄",
     title: "Laporan Progres",

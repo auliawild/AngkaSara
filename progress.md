@@ -10,6 +10,50 @@ Legend: ✅ selesai & terverifikasi · 🚧 sedang dikerjakan · ⬜ belum · �
 
 ---
 
+## 2026-08-05 — Pantauan Harian guru (online real-time + level SKIBA + riwayat) — TUNTAS (BELUM commit)
+
+### ✅ Konteks (permintaan user)
+- Guru bisa melihat siswa yang **login aktif (online real-time)** & kegiatan hariannya.
+- Guru bisa melihat **level SKIBA** yang dikerjakan siswa, sama seperti tampilan di siswa.
+- Guru bisa melihat **riwayat aktivitas lengkap** per siswa.
+- Akses **guru+admin, ikut lingkup kelas** (seperti Laporan/Evaluasi).
+
+### ✅ Implementasi
+- **Skema:** `Student.lastSeen DateTime?` (detak kehadiran). Migrasi dev `20260805063639_student_last_seen`;
+  PG `prisma/postgres/migrations/4_student_last_seen/` (ALTER kolom nullable, di-generate offline via
+  `migrate diff --from-schema git:HEAD --to-schema` sesuai prosedur DEPLOY.md).
+- **Heartbeat:** route `POST /api/hadir` (sesiSiswa → update lastSeen) + komponen client
+  `app/siswa/heartbeat.tsx` (ping saat mount, tiap 60s, & saat tab kembali terlihat) dipasang di
+  `app/siswa/layout.tsx`. "Online" = lastSeen ≤5 mnt (AMBANG di lib).
+- **Lib murni** `src/lib/pantau.ts` (+`tests/pantau.test.ts`, 7 tes): `statusKehadiran` (online/baru/lama),
+  `menitLalu`, `labelWaktuLalu`, `hariSama`, `ringkasHarian` (num/lit hari ini), `gabungRiwayat`
+  (PracticeActivity SKIBA/SKIBACA + CheckpointResult → lini masa kronologis).
+- **Server** `src/server/pantau.ts` (pakai `lingkupKelas`, guru+admin): `muatPantauan({kelas?})` daftar
+  siswa dlm lingkup + status online + rekap kegiatan hari ini (+aktivitas terakhir), diurut
+  online→teraktif→nama; `muatPantauanSiswa(id)` detail — hub SKIBA per topik (maxUnlocked/score/selesai
+  via TOPICS, cermin tampilan siswa) + diagnostik + riwayat 150 terbaru. Detail `null` di luar lingkup → `notFound()`.
+- **UI:** `/guru/pantau` (daftar kartu siswa: avatar+dot online animasi, kelas, kegiatan terakhir, badge
+  🧮/📖 hari ini; ringkasan "N online"; `pilih-kelas.tsx` dropdown; `auto-refresh.tsx` router.refresh 30s
+  bisa dijeda; LingkupBanner) + `/guru/pantau/[siswaId]` (identitas+kehadiran, grid 10 topik SKIBA dgn
+  Lv/bar/warna levelColor, lini masa riwayat). Kartu **Pantauan Harian** (🟢) di dasbor guru
+  (guru+admin). Middleware: /guru/pantau ikut tab=guru (bukan admin-only) — OK.
+
+### ✅ Verifikasi
+- `next build` **sukses** (TypeScript bersih; rute baru `/api/hadir`, `/guru/pantau`, `/guru/pantau/[siswaId]`
+  terdaftar). **Tes 131/131** (+7). Jalur DB nyata (skrip tsx): heartbeat→status "online/baru saja",
+  hub SKIBA benar (Pengurangan=Lv7 dst.), riwayat gabung SKIBACA(100%)/SKIBA(20%)/Check Point kronologis.
+  PG offline: diff = 1 ALTER kolom nullable.
+- **Gotcha terekam:** build **GAGAL type-check transien** ("Cannot find name 'ndlerConfig'" = validator
+  `.next/types` korup) KARENA **`next dev` (angkasara-dev) masih jalan** saat build (MEM-01, 4GB RAM) —
+  bukan bug kode. Obat: **stop dev server dulu → `rm -rf .next` → build**. `rm -rf .next` gagal
+  ("turbopack Directory not empty") selama dev server hidup. Wajib `prisma generate` setelah migrate
+  agar client kenal `lastSeen` (PRISMA7-02).
+- **UI e2e saat login STAF BELUM** (larangan ketik password; `/guru/pantau` guru+admin). Heartbeat sisi
+  siswa bisa di-e2e (login NISN). **User perlu cek visual sekali** saat login guru/admin.
+- **BELUM di-commit** (di atas `195d793`).
+
+---
+
 ## 2026-07-29 — Admin buka kembali kesempatan (Diagnostik SKIBA & Check Point) — TUNTAS (BELUM commit)
 
 ### ✅ Konteks
