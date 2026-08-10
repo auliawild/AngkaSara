@@ -3,6 +3,8 @@ import Link from "next/link";
 import { sesiSiswa } from "@/server/student-auth";
 import { prisma } from "@/lib/db";
 import { periodKey, klasifikasi, BULAN_PANJANG } from "@/lib/kelas";
+import { muatTargetSiswa } from "@/server/target";
+import { persenTarget } from "@/lib/target";
 import KeluarSiswa from "./keluar-siswa";
 
 export const metadata = { title: "Beranda Siswa — AngkaSara" };
@@ -32,6 +34,8 @@ export default async function SiswaPage() {
     }),
     prisma.skibacaProgress.count({ where: { studentId: sesi.studentId } }),
   ]);
+  const { rekap } = await muatTargetSiswa();
+  const targetKini = rekap.baris[rekap.idxKini];
 
   const bulan = BULAN_PANJANG[Number(period.split("-")[1]) - 1];
   const sudah = cp?.status === "submitted";
@@ -73,6 +77,25 @@ export default async function SiswaPage() {
             </div>
           </div>
         </section>
+
+        {/* TARGET BULANAN — ringkas, tautkan ke rincian */}
+        <Link
+          href="/siswa/target"
+          className="as-lift as-pop group relative overflow-hidden rounded-3xl border border-black/5 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-black text-zinc-800 dark:text-zinc-100">
+              🎯 Target {targetKini.label}
+            </h2>
+            <span className="text-xs font-bold text-indigo-600 group-hover:underline dark:text-indigo-400">
+              Rincian →
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <MiniTarget emoji="🧮" label="SKIBA" nilai={targetKini.skiba} target={targetKini.targetSkiba} tercapai={targetKini.skibaTercapai} warna="from-emerald-500 to-teal-600" />
+            <MiniTarget emoji="📖" label="SKIBACA" nilai={targetKini.skibaca} target={targetKini.targetSkibaca} tercapai={targetKini.skibacaTercapai} warna="from-amber-500 to-orange-600" />
+          </div>
+        </Link>
 
         {/* KARTU MODUL — urutan: latihan → Check Point → Papan Peringkat (paling bawah) */}
         <div className="grid gap-4">
@@ -154,6 +177,41 @@ function StatChip({ emoji, nilai, label }: { emoji: string; nilai: string; label
       <div className="text-base leading-none">{emoji}</div>
       <div className="mt-1 text-lg font-black leading-none">{nilai}</div>
       <div className="mt-1 text-[10px] font-medium leading-tight text-white/75">{label}</div>
+    </div>
+  );
+}
+
+function MiniTarget({
+  emoji,
+  label,
+  nilai,
+  target,
+  tercapai,
+  warna,
+}: {
+  emoji: string;
+  label: string;
+  nilai: number;
+  target: number;
+  tercapai: boolean;
+  warna: string;
+}) {
+  const pct = persenTarget(nilai, target);
+  return (
+    <div className="rounded-2xl bg-black/[0.03] p-2.5 dark:bg-white/5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-bold text-zinc-600 dark:text-zinc-300">
+          {emoji} {label}
+        </span>
+        {tercapai && <span className="text-[11px]">✅</span>}
+      </div>
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="text-lg font-black leading-none text-zinc-900 dark:text-zinc-50">{nilai}</span>
+        <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">/ {target}</span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+        <div className={`h-full rounded-full bg-gradient-to-r ${warna}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

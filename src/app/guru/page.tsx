@@ -70,6 +70,14 @@ const MODUL: Modul[] = [
     shadow: "0 16px 34px -20px rgba(16,185,129,.5)",
   },
   {
+    href: "/guru/target",
+    emoji: "🎯",
+    title: "Target Bulanan",
+    desc: "Capaian kumulatif SKIBA (50/bln) & SKIBACA (25/bln) per siswa & kelas.",
+    grad: "linear-gradient(135deg,#14b8a6,#f59e0b)",
+    shadow: "0 16px 34px -20px rgba(245,158,11,.5)",
+  },
+  {
     href: "/guru/laporan",
     emoji: "📄",
     title: "Laporan Progres",
