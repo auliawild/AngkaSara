@@ -127,6 +127,7 @@ type Mode = "hub" | "diag" | "arena" | "progres";
 export default function SkibaClient({ awal }: { awal: SkibaData }) {
   const [data, setData] = useState<SkibaData>(awal);
   const [mode, setMode] = useState<Mode>("hub");
+  const [arenaTopik, setArenaTopik] = useState<string | null>(null);
   const sfxRef = useRef<Sfx | null>(null);
   const sfx = () => (sfxRef.current ??= buatSfx());
 
@@ -169,12 +170,21 @@ export default function SkibaClient({ awal }: { awal: SkibaData }) {
       {mode === "hub" && (
         <Hub
           data={data}
-          onPilihArena={() => setMode("arena")}
+          onPilihTopik={(topicId) => {
+            setArenaTopik(topicId);
+            setMode("arena");
+          }}
           sfx={sfx}
         />
       )}
-      {mode === "arena" && (
-        <Arena data={data} sfx={sfx} onSelesai={segarkan} onKeluar={() => setMode("hub")} />
+      {mode === "arena" && arenaTopik && (
+        <Arena
+          data={data}
+          topikAwal={arenaTopik}
+          sfx={sfx}
+          onSelesai={segarkan}
+          onKeluar={() => setMode("hub")}
+        />
       )}
       {mode === "diag" && (
         <Diagnostik
@@ -192,11 +202,11 @@ export default function SkibaClient({ awal }: { awal: SkibaData }) {
 /* ===================== HUB / grid topik ===================== */
 function Hub({
   data,
-  onPilihArena,
+  onPilihTopik,
   sfx,
 }: {
   data: SkibaData;
-  onPilihArena: () => void;
+  onPilihTopik: (topicId: string) => void;
   sfx: () => Sfx;
 }) {
   return (
@@ -217,7 +227,7 @@ function Hub({
             key={t.topicId}
             onClick={() => {
               sfx().click();
-              onPilihArena();
+              onPilihTopik(t.topicId);
             }}
             className="as-lift as-pop flex items-center gap-3 rounded-2xl border border-black/10 bg-white/60 p-4 text-left dark:border-white/15 dark:bg-white/5"
           >
@@ -282,17 +292,21 @@ function StatGlass({ label, nilai }: { label: string; nilai: string }) {
 type FaseArena = "pilih" | "main" | "hasil";
 function Arena({
   data,
+  topikAwal,
   sfx,
   onSelesai,
   onKeluar,
 }: {
   data: SkibaData;
+  topikAwal: string;
   sfx: () => Sfx;
   onSelesai: () => void;
   onKeluar: () => void;
 }) {
-  const [topicId, setTopicId] = useState<string | null>(null);
-  const [level, setLevel] = useState<number | null>(null);
+  // Topik sudah dipilih dari Hub — di sini siswa langsung memilih level (tak pilih topik lagi).
+  const topikAwalObj = data.topik.find((t) => t.topicId === topikAwal) ?? data.topik[0];
+  const topicId = topikAwalObj.topicId;
+  const [level, setLevel] = useState<number>(Math.min(topikAwalObj.recLevel || 1, topikAwalObj.maxUnlocked));
   const [fase, setFase] = useState<FaseArena>("pilih");
   const [soal, setSoal] = useState<SoalKlien[]>([]);
   const [token, setToken] = useState("");
@@ -406,78 +420,67 @@ function Arena({
     );
   }
 
-  // fase pilih
+  // fase pilih — topik sudah dari Hub, siswa langsung memilih level
+  const topikKini = topik ?? topikAwalObj;
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <div className="mb-2 text-sm font-medium text-zinc-500">1. Pilih topik</div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {data.topik.map((t) => (
-            <button
-              key={t.topicId}
-              onClick={() => {
-                sfx().click();
-                setTopicId(t.topicId);
-                setLevel(Math.min(t.recLevel || 1, t.maxUnlocked));
-              }}
-              className={
-                "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors " +
-                (topicId === t.topicId
-                  ? "border-blue-600 bg-blue-50 dark:bg-blue-950/40"
-                  : "border-black/15 hover:border-blue-400 dark:border-white/20")
-              }
-            >
-              <span className="text-lg">{t.icon}</span>
-              <span className="min-w-0 flex-1 truncate">{t.name}</span>
-              <span className="shrink-0 text-xs text-zinc-400">Lv{t.maxUnlocked}</span>
-            </button>
-          ))}
+      {/* Kepala: topik terpilih + ganti topik */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white/60 p-3 dark:border-white/15 dark:bg-white/5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="text-3xl">{topikKini.icon}</span>
+          <div className="min-w-0">
+            <div className="truncate font-bold">{topikKini.name}</div>
+            <div className="text-xs text-zinc-500">Terbuka s/d Level {topikKini.maxUnlocked}</div>
+          </div>
         </div>
+        <button
+          onClick={() => {
+            sfx().click();
+            onKeluar();
+          }}
+          className="shrink-0 rounded-lg border border-black/15 px-3 py-1.5 text-xs font-semibold hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+        >
+          🔄 Ganti topik
+        </button>
       </div>
 
-      {topik && (
-        <div>
-          <div className="mb-2 text-sm font-medium text-zinc-500">
-            2. Pilih level (terbuka s/d {topik.maxUnlocked})
-          </div>
-          <div className="grid grid-cols-10 gap-1.5">
-            {Array.from({ length: 20 }, (_, i) => i + 1).map((L) => {
-              const terkunci = L > topik.maxUnlocked;
-              const aktif = level === L;
-              return (
-                <button
-                  key={L}
-                  disabled={terkunci}
-                  onClick={() => {
-                    sfx().click();
-                    setLevel(L);
-                  }}
-                  title={terkunci ? "Terkunci" : `Level ${L} · ${levelBand(L)}`}
-                  className={
-                    "aspect-square rounded-md text-xs font-bold transition-transform " +
-                    (terkunci
-                      ? "cursor-not-allowed bg-black/5 text-zinc-300 dark:bg-white/5 dark:text-zinc-600"
-                      : aktif
-                        ? "scale-110 text-white ring-2 ring-offset-1 dark:ring-offset-zinc-900"
-                        : "text-white opacity-80 hover:opacity-100")
-                  }
-                  style={terkunci ? undefined : { backgroundColor: levelColor(L) }}
-                >
-                  {terkunci ? "🔒" : L}
-                </button>
-              );
-            })}
-          </div>
-          {level && (
-            <p className="mt-2 text-sm">
-              Siap main: <b>{topik.icon} {topik.name}</b> · Level {level} ({levelBand(level)})
-              {topik.recLevel > 1 && level === topik.recLevel && (
-                <span className="text-zinc-400"> · rekomendasi diagnostik</span>
-              )}
-            </p>
-          )}
+      <div>
+        <div className="mb-2 text-sm font-medium text-zinc-500">Pilih level</div>
+        <div className="grid grid-cols-10 gap-1.5">
+          {Array.from({ length: 20 }, (_, i) => i + 1).map((L) => {
+            const terkunci = L > topikKini.maxUnlocked;
+            const aktif = level === L;
+            return (
+              <button
+                key={L}
+                disabled={terkunci}
+                onClick={() => {
+                  sfx().click();
+                  setLevel(L);
+                }}
+                title={terkunci ? "Terkunci" : `Level ${L} · ${levelBand(L)}`}
+                className={
+                  "aspect-square rounded-md text-xs font-bold transition-transform " +
+                  (terkunci
+                    ? "cursor-not-allowed bg-black/5 text-zinc-300 dark:bg-white/5 dark:text-zinc-600"
+                    : aktif
+                      ? "scale-110 text-white ring-2 ring-offset-1 dark:ring-offset-zinc-900"
+                      : "text-white opacity-80 hover:opacity-100")
+                }
+                style={terkunci ? undefined : { backgroundColor: levelColor(L) }}
+              >
+                {terkunci ? "🔒" : L}
+              </button>
+            );
+          })}
         </div>
-      )}
+        <p className="mt-2 text-sm">
+          Siap main: <b>{topikKini.icon} {topikKini.name}</b> · Level {level} ({levelBand(level)})
+          {topikKini.recLevel > 1 && level === topikKini.recLevel && (
+            <span className="text-zinc-400"> · rekomendasi diagnostik</span>
+          )}
+        </p>
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -490,7 +493,7 @@ function Arena({
         </button>
         <button
           onClick={mulai}
-          disabled={!topicId || !level || pending}
+          disabled={!level || pending}
           className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-teal-600/25 transition-transform hover:scale-105 disabled:scale-100 disabled:opacity-40"
         >
           {pending ? "Menyiapkan…" : "▶️ MULAI PERMAINAN"}
