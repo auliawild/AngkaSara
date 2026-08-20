@@ -45,6 +45,15 @@ const MODUL: Modul[] = [
     admin: true,
   },
   {
+    href: "/guru/data",
+    emoji: "📊",
+    title: "Data Penelitian",
+    desc: "Rekap rata-rata se-sekolah: diagnostik, Check Point, progres — ekspor Excel/CSV.",
+    grad: "linear-gradient(135deg,#8b5cf6,#4f46e5)",
+    shadow: "0 16px 34px -20px rgba(79,70,229,.5)",
+    admin: true,
+  },
+  {
     href: "/guru/kelas",
     emoji: "🏫",
     title: "Kelola Kelas",

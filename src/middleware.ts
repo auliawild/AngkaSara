@@ -20,6 +20,7 @@ export async function middleware(req: NextRequest) {
       const adminOnly =
         pathname.startsWith("/guru/staf") ||
         pathname.startsWith("/guru/siswa") ||
+        pathname.startsWith("/guru/data") ||
         pathname.startsWith("/guru/laporan/cetak-kelas");
       url.searchParams.set("tab", adminOnly ? "admin" : "guru");
       url.searchParams.set("next", pathname);
