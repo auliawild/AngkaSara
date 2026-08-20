@@ -16,7 +16,15 @@
  *
  * Skor % memakai pembulatan bilangan bulat (konsisten dgn Evaluasi/Raport). Rata-rata
  * "cacahan" per siswa (level, bacaan, poin, aktivitas) memakai 1 desimal agar informatif.
+ *
+ * SKALA PENILAIAN BERSAMA: seluruh skor asesmen — Diagnostik SKIBA (numerasi), Diagnostik
+ * SKIBACA (literasi), dan Check Point (numerasi & literasi) — memakai skala TUNGGAL 0..100
+ * dengan band `klasifikasi()` yang sama (Perlu Bimbingan / Cukup / Baik / Mahir). Ini yang
+ * membuat SKIBA Math & SKIBACA dapat dibandingkan langsung dan digambar pada satu grafik.
  */
+import { klasifikasi, BULAN_PENDEK, type Klasifikasi } from "./kelas";
+
+export const SKALA_MAKS = 100; // skala penilaian bersama SKIBA & SKIBACA
 
 /* ── Pembulatan ── */
 function bulat(x: number): number {
@@ -157,4 +165,77 @@ export function rekapPenelitian(rows: SiswaMetrik[], urutKelas: (a: string, b: s
     .sort((a, b) => urutKelas(a[0], b[0]))
     .map(([kelasLabel, list]) => ({ kelasLabel, ...agregat(list) }));
   return { sekolah: agregat(rows), perKelas };
+}
+
+/* ── Deret perkembangan tingkat SEKOLAH (siap grafik) ── */
+
+/** "YYYY-MM" → "Agu 2026". */
+export function labelPeriode(period: string): string {
+  const [th, bl] = period.split("-");
+  return `${BULAN_PENDEK[Number(bl) - 1] ?? bl} ${th}`;
+}
+
+/** Band klasifikasi bersama untuk suatu skor 0..100 (null bila tak ada data). */
+export function bandSkor(skor: number | null): Klasifikasi | null {
+  return skor == null ? null : klasifikasi(skor);
+}
+
+/** Rata Check Point satu bulan di tingkat sekolah (skala 0..100). */
+export interface BulanCP {
+  period: string; // "YYYY-MM"
+  numerasi: number | null;
+  literasi: number | null;
+}
+
+/**
+ * Satu titik pada grafik perkembangan sekolah. Titik pertama = baseline diagnostik ("Awal"),
+ * selanjutnya satu titik per bulan Check Point. `selisih*` = skor bulan itu − baseline
+ * diagnostik (positif = naik dari asesmen awal), hanya untuk titik Check Point.
+ */
+export interface TitikSekolah {
+  label: string;
+  period: string | null; // null untuk baseline
+  tipe: "diagnostik" | "checkpoint";
+  numerasi: number | null;
+  literasi: number | null;
+  selisihNum: number | null;
+  selisihLit: number | null;
+}
+
+/**
+ * Rangkai deret perkembangan sekolah: baseline diagnostik (rata skor diagnostik SKIBA sbg
+ * numerasi & SKIBACA sbg literasi) lalu rata Check Point tiap bulan. Bulan diurut menaik.
+ * Skala tunggal 0..100 untuk kedua domain → langsung bisa digambar & dibandingkan.
+ */
+export function deretSekolah(
+  baseline: { numerasi: number | null; literasi: number | null },
+  cpPerBulan: BulanCP[],
+): TitikSekolah[] {
+  const titik: TitikSekolah[] = [];
+  const adaBaseline = baseline.numerasi != null || baseline.literasi != null;
+  if (adaBaseline) {
+    titik.push({
+      label: "Awal (Diagnostik)",
+      period: null,
+      tipe: "diagnostik",
+      numerasi: baseline.numerasi,
+      literasi: baseline.literasi,
+      selisihNum: null,
+      selisihLit: null,
+    });
+  }
+  const selisih = (v: number | null, base: number | null) => (v == null || base == null ? null : v - base);
+  const urut = [...cpPerBulan].sort((a, b) => (a.period < b.period ? -1 : a.period > b.period ? 1 : 0));
+  for (const b of urut) {
+    titik.push({
+      label: labelPeriode(b.period),
+      period: b.period,
+      tipe: "checkpoint",
+      numerasi: b.numerasi,
+      literasi: b.literasi,
+      selisihNum: selisih(b.numerasi, baseline.numerasi),
+      selisihLit: selisih(b.literasi, baseline.literasi),
+    });
+  }
+  return titik;
 }

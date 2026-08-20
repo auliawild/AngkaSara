@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rataAda, agregat, rekapPenelitian, type SiswaMetrik } from "@/lib/penelitian";
+import { rataAda, agregat, rekapPenelitian, deretSekolah, labelPeriode, bandSkor, type SiswaMetrik } from "@/lib/penelitian";
 
 /** Pembangun metrik siswa ringkas — default "kosong", override sesuai kebutuhan. */
 function siswa(over: Partial<SiswaMetrik> = {}): SiswaMetrik {
@@ -107,5 +107,49 @@ describe("rekapPenelitian", () => {
     const rows = [siswa({ kelasLabel: "B" }), siswa({ kelasLabel: "A" })];
     const r = rekapPenelitian(rows, cmp);
     expect(r.perKelas.map((k) => k.kelasLabel)).toEqual(["A", "B"]);
+  });
+});
+
+describe("labelPeriode & bandSkor (skala bersama)", () => {
+  it("format bulan", () => {
+    expect(labelPeriode("2026-08")).toBe("Agu 2026");
+  });
+  it("band klasifikasi bersama 0..100", () => {
+    expect(bandSkor(null)).toBeNull();
+    expect(bandSkor(92)?.label).toBe("Mahir");
+    expect(bandSkor(80)?.label).toBe("Baik");
+    expect(bandSkor(65)?.label).toBe("Cukup");
+    expect(bandSkor(40)?.label).toBe("Perlu Bimbingan");
+  });
+});
+
+describe("deretSekolah", () => {
+  it("baseline diagnostik dulu, lalu Check Point tiap bulan terurut + selisih", () => {
+    const d = deretSekolah(
+      { numerasi: 50, literasi: 45 },
+      [
+        { period: "2026-09", numerasi: 65, literasi: 55 },
+        { period: "2026-08", numerasi: 60, literasi: 50 },
+      ],
+    );
+    expect(d.map((t) => t.label)).toEqual(["Awal (Diagnostik)", "Agu 2026", "Sep 2026"]);
+    expect(d[0].tipe).toBe("diagnostik");
+    expect(d[0].selisihNum).toBeNull(); // baseline tak punya selisih
+    expect(d[1]).toMatchObject({ tipe: "checkpoint", numerasi: 60, selisihNum: 10, selisihLit: 5 });
+    expect(d[2]).toMatchObject({ numerasi: 65, selisihNum: 15, selisihLit: 10 });
+  });
+
+  it("tanpa baseline (diagnostik kosong) → mulai dari bulan Check Point", () => {
+    const d = deretSekolah({ numerasi: null, literasi: null }, [{ period: "2026-08", numerasi: 60, literasi: 50 }]);
+    expect(d).toHaveLength(1);
+    expect(d[0].tipe).toBe("checkpoint");
+    expect(d[0].selisihNum).toBeNull(); // baseline null → selisih tak terdefinisi
+  });
+
+  it("selisih null bila salah satu sisi kosong", () => {
+    const d = deretSekolah({ numerasi: 50, literasi: null }, [{ period: "2026-08", numerasi: null, literasi: 55 }]);
+    const cp = d.find((t) => t.tipe === "checkpoint")!;
+    expect(cp.selisihNum).toBeNull(); // numerasi bulan kosong
+    expect(cp.selisihLit).toBeNull(); // baseline literasi kosong
   });
 });

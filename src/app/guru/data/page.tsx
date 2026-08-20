@@ -4,19 +4,56 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { muatDataPenelitian } from "@/server/penelitian";
 import { SEKOLAH } from "@/lib/sekolah";
-import type { AgregatKelas } from "@/lib/penelitian";
+import { bandSkor, type AgregatKelas, type TitikSekolah } from "@/lib/penelitian";
+import PerkembanganChart from "../laporan/perkembangan-chart";
 
 export const metadata = { title: "Data Penelitian — AngkaSara" };
 
 const nn = (x: number | null, suf = "") => (x == null ? "–" : `${x}${suf}`);
 
-function Stat({ label, nilai, sub, warna }: { label: string; nilai: string; sub?: string; warna?: string }) {
+function Stat({
+  label,
+  nilai,
+  sub,
+  warna,
+  bandOf,
+}: {
+  label: string;
+  nilai: string;
+  sub?: string;
+  warna?: string;
+  bandOf?: number | null; // skor 0..100 → chip klasifikasi skala bersama
+}) {
+  const band = bandOf === undefined ? null : bandSkor(bandOf);
   return (
     <div className="rounded-2xl border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
-      <div className={`text-2xl font-black leading-none ${warna ?? "text-zinc-900 dark:text-zinc-50"}`}>{nilai}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className={`text-2xl font-black leading-none ${warna ?? "text-zinc-900 dark:text-zinc-50"}`}>{nilai}</div>
+        {band && (
+          <span
+            className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white"
+            style={{ backgroundColor: band.color }}
+          >
+            {band.ic} {band.label}
+          </span>
+        )}
+      </div>
       <div className="mt-1.5 text-[12px] font-semibold text-zinc-600 dark:text-zinc-300">{label}</div>
       {sub && <div className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">{sub}</div>}
     </div>
+  );
+}
+
+/** Selisih Check Point vs diagnostik: warna hijau naik / merah turun. */
+function Selisih({ v }: { v: number | null }) {
+  if (v == null) return <span className="text-zinc-400">–</span>;
+  const naik = v > 0;
+  const turun = v < 0;
+  return (
+    <span className={naik ? "text-emerald-600 dark:text-emerald-400" : turun ? "text-rose-600 dark:text-rose-400" : "text-zinc-500"}>
+      {naik ? "▲ +" : turun ? "▼ " : "±"}
+      {v}
+    </span>
   );
 }
 
@@ -107,9 +144,9 @@ export default async function DataPenelitianPage() {
             judul="Tes Diagnostik (asesmen awal)"
             anak={
               <>
-                <Stat label="Rata skor Diagnostik SKIBA" nilai={nn(s.diagSkibaSkor)} sub={`${s.diagSkibaN} dari ${s.jumlahSiswa} siswa`} warna="text-emerald-600 dark:text-emerald-400" />
+                <Stat label="Rata skor Diagnostik SKIBA" nilai={nn(s.diagSkibaSkor)} sub={`${s.diagSkibaN} dari ${s.jumlahSiswa} siswa · skala 0–100`} warna="text-emerald-600 dark:text-emerald-400" bandOf={s.diagSkibaSkor} />
+                <Stat label="Rata skor Diagnostik SKIBACA" nilai={nn(s.diagBacaSkor)} sub={`${s.diagBacaN} dari ${s.jumlahSiswa} siswa · skala 0–100`} warna="text-amber-600 dark:text-amber-400" bandOf={s.diagBacaSkor} />
                 <Stat label="Rata level saran SKIBA" nilai={nn(s.diagSkibaLevel)} sub="skala 1–20" />
-                <Stat label="Rata skor Diagnostik SKIBACA" nilai={nn(s.diagBacaSkor)} sub={`${s.diagBacaN} dari ${s.jumlahSiswa} siswa`} warna="text-amber-600 dark:text-amber-400" />
                 <Stat label="Rata level saran SKIBACA" nilai={nn(s.diagBacaRec)} sub="skala 1–5" />
               </>
             }
@@ -120,9 +157,9 @@ export default async function DataPenelitianPage() {
             judul="Check Point (nilai formal bulanan)"
             anak={
               <>
-                <Stat label="Rata Nilai Akhir" nilai={nn(s.cpTotal)} sub={`${s.cpN} dari ${s.jumlahSiswa} siswa ikut`} warna="text-violet-600 dark:text-violet-400" />
-                <Stat label="Rata Numerasi" nilai={nn(s.cpNumerasi)} />
-                <Stat label="Rata Literasi" nilai={nn(s.cpLiterasi)} />
+                <Stat label="Rata Nilai Akhir" nilai={nn(s.cpTotal)} sub={`${s.cpN} dari ${s.jumlahSiswa} siswa ikut · skala 0–100`} warna="text-violet-600 dark:text-violet-400" bandOf={s.cpTotal} />
+                <Stat label="Rata Numerasi (SKIBA)" nilai={nn(s.cpNumerasi)} sub="skala 0–100" bandOf={s.cpNumerasi} />
+                <Stat label="Rata Literasi (SKIBACA)" nilai={nn(s.cpLiterasi)} sub="skala 0–100" bandOf={s.cpLiterasi} />
                 <Stat label="Siswa ikut Check Point" nilai={`${s.cpN}`} sub={`dari ${s.jumlahSiswa}`} />
               </>
             }
@@ -140,6 +177,47 @@ export default async function DataPenelitianPage() {
               </>
             }
           />
+
+          {/* Perkembangan sekolah: Diagnostik → Check Point tiap bulan (skala bersama 0–100) */}
+          <section className="rounded-3xl border border-black/5 bg-white/60 p-4 dark:border-white/10 dark:bg-white/5 sm:p-5">
+            <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-200">
+              <span>📉</span>
+              Perkembangan sekolah: Diagnostik → Check Point tiap bulan
+            </h2>
+            <p className="mb-3 text-[12px] text-zinc-500 dark:text-zinc-400">
+              Skala penilaian <b>bersama 0–100</b> untuk numerasi (SKIBA) &amp; literasi (SKIBACA). Titik pertama =
+              baseline diagnostik; berikutnya rata Check Point tiap bulan. Selisih = Check Point − diagnostik.
+            </p>
+            <PerkembanganChart titik={d.perkembangan.map((t) => ({ label: t.label, numerasi: t.numerasi, literasi: t.literasi }))} />
+
+            {/* Tabel selisih per bulan */}
+            {d.perkembangan.some((t: TitikSekolah) => t.tipe === "checkpoint") && (
+              <div className="mt-4 overflow-x-auto rounded-2xl border border-black/5 dark:border-white/10">
+                <table className="w-full text-sm">
+                  <thead className="bg-black/[0.03] text-left text-xs font-bold uppercase tracking-wide text-zinc-500 dark:bg-white/5 dark:text-zinc-400">
+                    <tr>
+                      <th className="px-3 py-2">Titik</th>
+                      <th className="px-3 py-2">Numerasi</th>
+                      <th className="px-3 py-2">Δ vs Diagnostik</th>
+                      <th className="px-3 py-2">Literasi</th>
+                      <th className="px-3 py-2">Δ vs Diagnostik</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5 dark:divide-white/10">
+                    {d.perkembangan.map((t: TitikSekolah) => (
+                      <tr key={t.label} className={t.tipe === "diagnostik" ? "bg-black/[0.02] dark:bg-white/[0.03]" : ""}>
+                        <td className="px-3 py-2 font-semibold whitespace-nowrap">{t.label}</td>
+                        <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">{nn(t.numerasi)}</td>
+                        <td className="px-3 py-2"><Selisih v={t.selisihNum} /></td>
+                        <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">{nn(t.literasi)}</td>
+                        <td className="px-3 py-2"><Selisih v={t.selisihLit} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
           {/* Rincian per kelas */}
           <section>

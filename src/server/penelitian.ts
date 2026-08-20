@@ -17,7 +17,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { urutkanKelas } from "@/lib/kelas";
-import { rekapPenelitian, type SiswaMetrik, type RekapPenelitian } from "@/lib/penelitian";
+import { rekapPenelitian, deretSekolah, type SiswaMetrik, type RekapPenelitian, type TitikSekolah } from "@/lib/penelitian";
 
 /** Pastikan sesi ADMIN (halaman se-sekolah bersifat sensitif). */
 async function requireAdmin(): Promise<void> {
@@ -49,6 +49,7 @@ function rataScoresDiag(json: string): number | null {
 
 export interface DataPenelitian extends RekapPenelitian {
   dibuatPada: string; // ISO waktu snapshot diambil (untuk lampiran penelitian)
+  perkembangan: TitikSekolah[]; // deret sekolah: diagnostik → Check Point tiap bulan (skala 0..100)
 }
 
 /** Muat rekap penelitian seluruh sekolah (admin). */
@@ -61,11 +62,11 @@ export async function muatDataPenelitian(): Promise<DataPenelitian> {
   });
   const dibuatPada = new Date().toISOString();
   if (students.length === 0) {
-    return { sekolah: rekapPenelitian([], urutkanKelas).sekolah, perKelas: [], dibuatPada };
+    return { sekolah: rekapPenelitian([], urutkanKelas).sekolah, perKelas: [], dibuatPada, perkembangan: [] };
   }
   const ids = students.map((s) => s.id);
 
-  const [profil, skibaRows, diagBaca, cpRows, bacaRows, aktRows] = await Promise.all([
+  const [profil, skibaRows, diagBaca, cpRows, cpBulanRows, bacaRows, aktRows] = await Promise.all([
     // Diagnostik SKIBA: skor % awal per siswa.
     prisma.skibaProfile.findMany({
       where: { studentId: { in: ids } },
@@ -86,6 +87,13 @@ export async function muatDataPenelitian(): Promise<DataPenelitian> {
     prisma.checkpointResult.findMany({
       where: { studentId: { in: ids }, status: "submitted" },
       select: { studentId: true, numerasi: true, literasi: true, total: true },
+    }),
+    // Check Point per BULAN (tingkat sekolah) → deret perkembangan.
+    prisma.checkpointResult.groupBy({
+      by: ["period"],
+      where: { studentId: { in: ids }, status: "submitted" },
+      _avg: { numerasi: true, literasi: true },
+      orderBy: { period: "asc" },
     }),
     // SKIBACA progres: cacah bacaan + rata persen & WPM.
     prisma.skibacaProgress.groupBy({
@@ -182,5 +190,11 @@ export async function muatDataPenelitian(): Promise<DataPenelitian> {
     };
   });
 
-  return { ...rekapPenelitian(rows, urutkanKelas), dibuatPada };
+  const rekap = rekapPenelitian(rows, urutkanKelas);
+  // Deret perkembangan sekolah: baseline diagnostik (rata skor sekolah) → Check Point tiap bulan.
+  const perkembangan = deretSekolah(
+    { numerasi: rekap.sekolah.diagSkibaSkor, literasi: rekap.sekolah.diagBacaSkor },
+    cpBulanRows.map((r) => ({ period: r.period, numerasi: bulat(r._avg.numerasi), literasi: bulat(r._avg.literasi) })),
+  );
+  return { ...rekap, dibuatPada, perkembangan };
 }

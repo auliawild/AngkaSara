@@ -104,6 +104,26 @@ export async function GET(req: Request) {
   totalRow.font = { bold: true };
   totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDE9FE" } };
 
+  // Sheet perkembangan sekolah (siap grafik): diagnostik → Check Point tiap bulan (skala 0–100).
+  const KOLOM_P = ["Titik", "Periode", "Tipe", "Numerasi (SKIBA)", "Literasi (SKIBACA)", "Δ Num vs Diagnostik", "Δ Lit vs Diagnostik"];
+  const pw = wb.addWorksheet("Perkembangan", { views: [{ state: "frozen", ySplit: 1 }] });
+  pw.addRow(KOLOM_P);
+  const phead = pw.getRow(1);
+  phead.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  phead.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF7C3AED" } };
+  pw.columns.forEach((c, i) => (c.width = i === 0 ? 18 : 18));
+  for (const t of d.perkembangan) {
+    pw.addRow([
+      t.label,
+      t.period ?? "",
+      t.tipe === "diagnostik" ? "Diagnostik" : "Check Point",
+      kosong(t.numerasi),
+      kosong(t.literasi),
+      kosong(t.selisihNum),
+      kosong(t.selisihLit),
+    ]);
+  }
+
   // Sheet metadata untuk konteks penelitian.
   const meta = wb.addWorksheet("Keterangan");
   meta.getColumn(1).width = 26;
@@ -115,7 +135,9 @@ export async function GET(req: Request) {
     ["Diagnostik & Check Point", "Rata-rata dihitung HANYA atas siswa yang mengikuti; kolom (n) = jumlah pengikut."],
     ["Progres pengerjaan", "Rata-rata atas SELURUH siswa (yang belum mengerjakan dihitung 0)."],
     ["Mutu SKIBACA (% Kuis, WPM)", "Hanya atas siswa yang sudah membaca minimal satu bacaan."],
-    ["Skala skor", "Diag SKIBA/SKIBACA & Check Point: 0–100. SKIBA Level: 0–200. Diag SKIBACA Lv Saran: 1–5."],
+    ["Skala penilaian bersama", "Seluruh skor asesmen (Diagnostik SKIBA & SKIBACA, Check Point numerasi & literasi) memakai skala TUNGGAL 0–100 dengan band sama (Perlu Bimbingan <60 / Cukup 60–74 / Baik 75–89 / Mahir ≥90) → SKIBA & SKIBACA dapat dibandingkan langsung."],
+    ["Sheet Perkembangan", "Deret siap grafik: baseline diagnostik lalu rata Check Point tiap bulan; kolom Δ = Check Point − diagnostik (positif = naik dari asesmen awal)."],
+    ["Skala lain", "SKIBA Level: 0–200. Diag SKIBACA Lv Saran: 1–5. Diag SKIBA Level: 1–20."],
   ];
   info.forEach(([k, v]) => {
     const row = meta.addRow([k, v]);
