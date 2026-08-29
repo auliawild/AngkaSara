@@ -6,7 +6,6 @@ import { BULAN_PANJANG, ikonJurusan } from "@/lib/kelas";
 import { SKIBA_TOTAL_LEVEL, SKIBA_TOTAL_TOPIK, type RaportSiswa } from "@/lib/laporan";
 import { SEKOLAH } from "@/lib/sekolah";
 import KopSekolah from "./kop-sekolah";
-import PerkembanganChart from "./perkembangan-chart";
 import { BlokTandaTangan } from "./tanda-tangan";
 
 function labelBulan(period: string): string {
@@ -215,20 +214,9 @@ export default function RaportSheet({
         )}
       </section>
 
-      {/* D. Lampiran — Grafik Perkembangan */}
+      {/* D. Catatan */}
       <section className="mt-5">
-        <h3 className="text-sm font-bold">D. Lampiran — Grafik Perkembangan</h3>
-        <p className="mt-0.5 text-xs text-zinc-500">
-          Dari tes diagnostik awal ke skor Check Point tiap bulan (skala 0–100).
-        </p>
-        <div className="mt-2 rounded-lg border border-zinc-300 p-2">
-          <PerkembanganChart titik={r.perkembangan} />
-        </div>
-      </section>
-
-      {/* E. Catatan */}
-      <section className="mt-5">
-        <h3 className="text-sm font-bold">E. Catatan</h3>
+        <h3 className="text-sm font-bold">D. Catatan</h3>
         <p className="mt-1 text-sm text-zinc-700">{deskripsiNaratif(r.nama, r.cp.total, r.cp.klas?.label)}</p>
       </section>
 
