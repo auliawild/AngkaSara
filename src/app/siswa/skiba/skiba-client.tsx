@@ -306,7 +306,10 @@ function Arena({
   // Topik sudah dipilih dari Hub — di sini siswa langsung memilih level (tak pilih topik lagi).
   const topikAwalObj = data.topik.find((t) => t.topicId === topikAwal) ?? data.topik[0];
   const topicId = topikAwalObj.topicId;
-  const [level, setLevel] = useState<number>(Math.min(topikAwalObj.recLevel || 1, topikAwalObj.maxUnlocked));
+  // Default = level FRONTIER (tertinggi yang terbuka). Memilih level frontier itulah yang
+  // membuka level berikutnya; kalau default ke level rendah, siswa mengulang level lama dan
+  // tak pernah "naik level" (unlock hanya saat main level == maxUnlocked, lihat lib/skiba).
+  const [level, setLevel] = useState<number>(topikAwalObj.maxUnlocked);
   const [fase, setFase] = useState<FaseArena>("pilih");
   const [soal, setSoal] = useState<SoalKlien[]>([]);
   const [token, setToken] = useState("");
@@ -402,12 +405,14 @@ function Arena({
         <div className="mt-5 flex flex-wrap justify-center gap-3">
           <button
             onClick={() => {
+              // Naik ke level yang baru terbuka agar progres berlanjut (bukan mengulang level lama).
+              if (hasil.unlockNext) setLevel(hasil.unlockNext);
               setFase("pilih");
               setHasil(null);
             }}
             className="rounded-full bg-white px-6 py-2.5 text-sm font-bold text-zinc-800 shadow transition-transform hover:scale-105"
           >
-            🎮 Main lagi
+            {hasil.unlockNext ? "⬆️ Lanjut level" : "🎮 Main lagi"}
           </button>
           <button
             onClick={onKeluar}
