@@ -375,6 +375,10 @@ export interface BarisProgresKelas {
   totalPoin: number;
   rataNum: number | null; // mutu: rata skor numerasi
   rataLit: number | null;
+  // Check Point bulan ini (nilai formal 0–100); null = belum dikerjakan bulan ini.
+  cpNumerasi: number | null;
+  cpLiterasi: number | null;
+  cpTotal: number | null;
 }
 export interface ProgresKelas {
   kelas: string;
@@ -410,6 +414,15 @@ export async function muatProgresKelas(params: { kelas: string; bulan?: string }
       })
     : [];
 
+  // Check Point bulan ini (nilai formal) — 1 baris/siswa/bulan.
+  const cp = ids.length
+    ? await prisma.checkpointResult.findMany({
+        where: { studentId: { in: ids }, period: bulanId, status: "submitted" },
+        select: { studentId: true, numerasi: true, literasi: true, total: true },
+      })
+    : [];
+  const cpByStudent = new Map(cp.map((r) => [r.studentId, r]));
+
   const byStudent = new Map<string, { ts: Date; domain: string; score: number; points: number }[]>();
   for (const a of akt) {
     const arr = byStudent.get(a.studentId) ?? [];
@@ -419,6 +432,7 @@ export async function muatProgresKelas(params: { kelas: string; bulan?: string }
 
   const baris: BarisProgresKelas[] = students.map((st) => {
     const r = agregatBulan(byStudent.get(st.id) ?? [], tahun, bulan);
+    const c = cpByStudent.get(st.id) ?? null;
     return {
       siswaId: st.id,
       nama: st.nama,
@@ -428,6 +442,9 @@ export async function muatProgresKelas(params: { kelas: string; bulan?: string }
       totalPoin: r.totalPoin,
       rataNum: r.rataNum,
       rataLit: r.rataLit,
+      cpNumerasi: c?.numerasi ?? null,
+      cpLiterasi: c?.literasi ?? null,
+      cpTotal: c?.total ?? null,
     };
   });
 

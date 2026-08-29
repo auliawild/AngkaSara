@@ -37,6 +37,10 @@ export default async function CetakProgresKelasPage({
   const totNum = d.baris.reduce((s, b) => s + b.totalNum, 0);
   const totLit = d.baris.reduce((s, b) => s + b.totalLit, 0);
   const totPoin = d.baris.reduce((s, b) => s + b.totalPoin, 0);
+  const rataCpNum = rataDari(d.baris.map((b) => b.cpNumerasi));
+  const rataCpLit = rataDari(d.baris.map((b) => b.cpLiterasi));
+  const rataCpTotal = rataDari(d.baris.map((b) => b.cpTotal));
+  const cpIkut = d.baris.filter((b) => b.cpTotal != null).length;
 
   return (
     <main className="mx-auto flex w-full max-w-[210mm] flex-1 flex-col gap-5 px-6 py-8">
@@ -68,20 +72,27 @@ export default async function CetakProgresKelasPage({
 
         <table className="mt-4 w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-zinc-100 text-left">
-              <Th>No</Th>
-              <Th>Nama</Th>
+            <tr className="bg-zinc-100 text-center">
+              <Th center rowSpan={2}>No</Th>
+              <Th rowSpan={2}>Nama</Th>
+              <Th center colSpan={5}>Progres Latihan</Th>
+              <Th center colSpan={3}>Check Point {d.bulanLabel}</Th>
+            </tr>
+            <tr className="bg-zinc-100 text-center">
               <Th center>Numerasi</Th>
               <Th center>Rata Nilai</Th>
               <Th center>Literasi</Th>
               <Th center>Rata Nilai</Th>
               <Th center>Poin</Th>
+              <Th center>Numerasi</Th>
+              <Th center>Literasi</Th>
+              <Th center>Nilai</Th>
             </tr>
           </thead>
           <tbody>
             {d.baris.length === 0 ? (
               <tr>
-                <td colSpan={7} className="border border-zinc-300 px-3 py-2 text-center text-zinc-500">
+                <td colSpan={10} className="border border-zinc-300 px-3 py-2 text-center text-zinc-500">
                   Belum ada siswa aktif di kelas ini.
                 </td>
               </tr>
@@ -98,6 +109,11 @@ export default async function CetakProgresKelasPage({
                   <Td center>{b.totalLit}</Td>
                   <Td center>{b.rataLit ?? "—"}</Td>
                   <Td center>{b.totalPoin}</Td>
+                  <Td center>{b.cpNumerasi ?? "—"}</Td>
+                  <Td center>{b.cpLiterasi ?? "—"}</Td>
+                  <Td center>
+                    {b.cpTotal ?? <span className="text-zinc-400">belum</span>}
+                  </Td>
                 </tr>
               ))
             )}
@@ -112,13 +128,18 @@ export default async function CetakProgresKelasPage({
                 <Td center>{totLit}</Td>
                 <Td center>{rataLitKelas ?? "—"}</Td>
                 <Td center>{totPoin}</Td>
+                <Td center>{rataCpNum ?? "—"}</Td>
+                <Td center>{rataCpLit ?? "—"}</Td>
+                <Td center>{rataCpTotal ?? "—"}</Td>
               </tr>
             </tfoot>
           )}
         </table>
 
         <p className="mt-2 text-xs text-zinc-500">
-          Kolom Numerasi/Literasi = jumlah pengerjaan (kuantitas); Rata Nilai = mutu capaian (skor rata-rata 0–100).
+          Progres Latihan: kolom Numerasi/Literasi = jumlah pengerjaan (kuantitas), Rata Nilai = mutu capaian (0–100).
+          Check Point = nilai formal bulanan (0–100){cpIkut > 0 ? `; ${cpIkut} dari ${d.baris.length} siswa mengikuti bulan ini` : ""};
+          baris Rata Kelas untuk Check Point = rata-rata siswa yang mengikuti. “belum” = belum mengerjakan Check Point bulan ini.
         </p>
 
         <section className="mt-8 flex justify-end text-sm">
@@ -136,9 +157,25 @@ export default async function CetakProgresKelasPage({
   );
 }
 
-function Th({ children, center }: { children: React.ReactNode; center?: boolean }) {
+function Th({
+  children,
+  center,
+  colSpan,
+  rowSpan,
+}: {
+  children: React.ReactNode;
+  center?: boolean;
+  colSpan?: number;
+  rowSpan?: number;
+}) {
   return (
-    <th className={`border border-zinc-300 px-3 py-1.5 font-semibold ${center ? "text-center" : ""}`}>{children}</th>
+    <th
+      colSpan={colSpan}
+      rowSpan={rowSpan}
+      className={`border border-zinc-300 px-3 py-1.5 align-middle font-semibold ${center ? "text-center" : ""}`}
+    >
+      {children}
+    </th>
   );
 }
 function Td({ children, center }: { children: React.ReactNode; center?: boolean }) {
