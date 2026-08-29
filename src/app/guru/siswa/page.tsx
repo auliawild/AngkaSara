@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { urutkanKelas, ikonJurusan, periodKey, BULAN_PANJANG } from "@/lib/kelas";
+import { urutkanKelas, ikonJurusan, periodKey, BULAN_PANJANG, daftarPeriodeLampau, labelPeriode } from "@/lib/kelas";
 import { MAX_DIAG_ATTEMPTS } from "@/lib/skiba";
 import SiswaTabel from "./siswa-tabel";
 import ImporPanel from "./impor-panel";
@@ -59,6 +59,22 @@ export default async function KelolaSiswaPage({
   const [thP, blP] = period.split("-").map(Number);
   const periodeLabel = `${BULAN_PANJANG[(blP ?? 1) - 1] ?? ""} ${thP ?? ""}`.trim();
 
+  // Status Check Point bulan-bulan LAMPAU (untuk buka susulan). 6 bulan terakhir sebelum berjalan.
+  const bulanLampau = daftarPeriodeLampau(new Date(), 6);
+  const bulanLampauOpsi = bulanLampau.map((p) => ({ period: p, label: labelPeriode(p) }));
+  const cpLampauRows = siswaRows.length
+    ? await prisma.checkpointResult.findMany({
+        where: { studentId: { in: siswaRows.map((s) => s.id) }, period: { in: bulanLampau } },
+        select: { studentId: true, period: true, status: true },
+      })
+    : [];
+  const cpLampauByStudent = new Map<string, Record<string, "in_progress" | "submitted">>();
+  for (const r of cpLampauRows) {
+    const m = cpLampauByStudent.get(r.studentId) ?? {};
+    m[r.period] = r.status as "in_progress" | "submitted";
+    cpLampauByStudent.set(r.studentId, m);
+  }
+
   const siswa = siswaRows.map((s) => ({
     id: s.id,
     nisn: s.nisn,
@@ -67,6 +83,7 @@ export default async function KelolaSiswaPage({
     kelasId: s.kelasId,
     diagTerpakai: s.skibaProfile?.diagAttempts ?? 0,
     cpStatus: (cpByStudent.get(s.id) ?? null) as "in_progress" | "submitted" | null,
+    cpLampau: cpLampauByStudent.get(s.id) ?? {},
   }));
 
   return (
@@ -133,6 +150,7 @@ export default async function KelolaSiswaPage({
             kelasOpsi={kelasOpsi}
             diagMaks={MAX_DIAG_ATTEMPTS}
             periodeLabel={periodeLabel}
+            bulanLampauOpsi={bulanLampauOpsi}
           />
         ) : (
           <p className="text-sm text-zinc-500">Belum ada kelas. Jalankan seed terlebih dahulu.</p>

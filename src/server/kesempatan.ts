@@ -12,7 +12,8 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { periodKey, BULAN_PANJANG } from "@/lib/kelas";
+import { periodKey, periodeLampau, labelPeriode } from "@/lib/kelas";
+import { dataBarisCheckpoint } from "@/server/checkpoint-core";
 
 /** Pastikan sesi ADMIN. */
 async function requireAdmin(): Promise<void> {
@@ -26,12 +27,6 @@ export interface KesempatanResult {
   ok: boolean;
   error?: string;
   pesan?: string;
-}
-
-/** Label ramah "Juli 2026" dari periodKey "2026-07". */
-function labelPeriode(period: string): string {
-  const [th, bl] = period.split("-").map(Number);
-  return `${BULAN_PANJANG[(bl ?? 1) - 1] ?? ""} ${th ?? ""}`.trim();
 }
 
 /**
@@ -77,5 +72,62 @@ export async function bukaCheckpoint(studentId: string): Promise<KesempatanResul
   return {
     ok: true,
     pesan: `Check Point ${labelPeriode(period)} untuk ${siswa.nama} dibuka kembali (skor lama dihapus).`,
+  };
+}
+
+/**
+ * Buka Check Point SUSULAN untuk bulan LAMPAU (yang terlewat/ingin diulang). Menyiapkan baris
+ * berstatus in_progress untuk (siswa, periode) sehingga siswa bisa mengerjakannya; skor akan
+ * tersimpan di bulan tersebut (memperbarui riwayat/raport/Evaluasi bulan itu). Bila bulan itu
+ * sudah ada hasil, hasil lama ditimpa (di-reset). Bulan berjalan/masa depan ditolak — pakai
+ * `bukaCheckpoint` untuk bulan berjalan.
+ */
+export async function bukaCheckpointSusulan(studentId: string, period: string): Promise<KesempatanResult> {
+  await requireAdmin();
+  if (!periodeLampau(period)) return { ok: false, error: "Hanya bulan yang sudah lewat yang bisa dibuka susulan." };
+
+  const siswa = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { nama: true, kelas: { select: { label: true } } },
+  });
+  if (!siswa) return { ok: false, error: "Siswa tidak ditemukan." };
+
+  const ada = await prisma.checkpointResult.findUnique({
+    where: { studentId_period: { studentId, period } },
+    select: { status: true },
+  });
+  if (ada?.status === "in_progress")
+    return { ok: true, pesan: `Susulan Check Point ${labelPeriode(period)} untuk ${siswa.nama} sudah terbuka.` };
+
+  const data = await dataBarisCheckpoint({ studentId, kelasLabel: siswa.kelas.label, period });
+  await prisma.checkpointResult.upsert({
+    where: { studentId_period: { studentId, period } },
+    create: data,
+    update: {
+      seed: data.seed,
+      kelasLabel: data.kelasLabel,
+      numerasi: 0,
+      literasi: 0,
+      total: 0,
+      benarNum: 0,
+      totalNum: data.totalNum,
+      benarLit: 0,
+      totalLit: data.totalLit,
+      durasiDetik: 0,
+      waktuHabis: false,
+      payload: data.payload,
+      status: "in_progress",
+      startedAt: data.startedAt,
+      submittedAt: null,
+    },
+  });
+
+  revalidatePath("/guru/siswa");
+  revalidatePath("/siswa/checkpoint");
+  revalidatePath("/siswa");
+  const catatan = ada ? " (hasil lama ditimpa)" : "";
+  return {
+    ok: true,
+    pesan: `Susulan Check Point ${labelPeriode(period)} untuk ${siswa.nama} dibuka${catatan}.`,
   };
 }

@@ -10,9 +10,13 @@ type Fase = "intro" | "kuis";
 export default function CheckpointClient({
   namaBulan,
   sedangKerja,
+  period,
+  susulan = false,
 }: {
   namaBulan: string;
   sedangKerja: boolean;
+  period?: string; // periode susulan (bulan lampau); undefined = bulan berjalan
+  susulan?: boolean;
 }) {
   const router = useRouter();
   const [fase, setFase] = useState<Fase>("intro");
@@ -31,9 +35,10 @@ export default function CheckpointClient({
     setPending(true);
     setError(null);
     try {
-      const res = await mulaiCheckpoint();
+      const res = await mulaiCheckpoint(period);
       if (res.status === "sudah") {
-        router.refresh();
+        if (susulan) router.push("/siswa/checkpoint");
+        else router.refresh();
         return;
       }
       const s = res.soal!;
@@ -56,21 +61,22 @@ export default function CheckpointClient({
       setPending(true);
       setError(null);
       try {
-        const res = await submitCheckpoint({ jawabNum, jawabLit, waktuHabis });
+        const res = await submitCheckpoint({ jawabNum, jawabLit, waktuHabis, period });
         if (!res.ok) {
           setError(res.error ?? "Gagal mengumpulkan.");
           terkirim.current = false;
           setPending(false);
           return;
         }
-        router.refresh();
+        if (susulan) router.push("/siswa/checkpoint");
+        else router.refresh();
       } catch (e) {
         setError((e as Error).message || "Gagal mengumpulkan.");
         terkirim.current = false;
         setPending(false);
       }
     },
-    [jawabNum, jawabLit, router],
+    [jawabNum, jawabLit, router, period, susulan],
   );
 
   // Timer mundur (server tetap berwenang; ini agar UI auto-kumpul saat habis).
@@ -89,14 +95,14 @@ export default function CheckpointClient({
       <div className="as-pop overflow-hidden rounded-3xl border border-black/5 bg-white/70 shadow-lg dark:border-white/10 dark:bg-white/5">
         <div className="relative overflow-hidden bg-gradient-to-br from-sky-500 to-blue-600 p-6 text-white">
           <div aria-hidden className="absolute -right-3 -top-4 text-7xl opacity-20 as-float select-none">📋</div>
-          <p className="relative text-sm font-medium text-white/80">Ujian bulanan</p>
+          <p className="relative text-sm font-medium text-white/80">{susulan ? "Ujian susulan" : "Ujian bulanan"}</p>
           <h1 className="relative text-2xl font-black">Check Point {namaBulan}</h1>
         </div>
         <div className="p-6">
           <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
             <li>📐 20 soal numerasi + 📖 15 soal literasi (3 bacaan × 5)</li>
             <li>⏱️ Waktu 30 menit — otomatis terkumpul saat habis</li>
-            <li>🔒 Hanya bisa dikerjakan <b>sekali</b> bulan ini</li>
+            <li>🔒 Hanya bisa dikerjakan <b>sekali</b>{susulan ? " (susulan)" : " bulan ini"}</li>
           </ul>
           <p className="mt-4 text-sm font-semibold text-blue-600 dark:text-blue-300">
             Tenang & fokus — kamu pasti bisa! 💪

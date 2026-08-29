@@ -8,6 +8,9 @@ import {
   bucketTerakhir,
   bucketKey,
   periodKey,
+  labelPeriode,
+  periodeLampau,
+  daftarPeriodeLampau,
 } from "@/lib/kelas";
 
 describe("kelas: konfigurasi 46 kelas", () => {
@@ -68,5 +71,24 @@ describe("kelas: periode & bucket", () => {
     expect(hari[13]).toBe("2026-07-17");
     expect(hari[0]).toBe("2026-07-04");
     expect(bucketTerakhir("bulan", 12, now).length).toBe(12);
+  });
+});
+
+describe("periode lampau (Check Point susulan)", () => {
+  const now = new Date(2026, 7, 15); // Agustus 2026 → periode berjalan 2026-08
+  it("labelPeriode format panjang", () => {
+    expect(labelPeriode("2026-07")).toBe("Juli 2026");
+    expect(labelPeriode("2026-11")).toBe("November 2026");
+  });
+  it("periodeLampau: hanya bulan sebelum berjalan", () => {
+    expect(periodeLampau("2026-07", now)).toBe(true);
+    expect(periodeLampau("2026-08", now)).toBe(false); // bulan berjalan
+    expect(periodeLampau("2026-09", now)).toBe(false); // masa depan
+    expect(periodeLampau("bukan-periode", now)).toBe(false);
+  });
+  it("daftarPeriodeLampau: n bulan sebelum berjalan, lintas tahun", () => {
+    expect(daftarPeriodeLampau(now, 3)).toEqual(["2026-07", "2026-06", "2026-05"]);
+    const jan = new Date(2026, 0, 10); // Januari 2026 → mundur lintas tahun
+    expect(daftarPeriodeLampau(jan, 2)).toEqual(["2025-12", "2025-11"]);
   });
 });

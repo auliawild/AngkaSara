@@ -4,41 +4,26 @@
  * klien tak pernah menerima kunci jawaban, dan penilaian membandingkan ke `payload`
  * yang disimpan saat mulai (bukan ke apa pun dari klien). `@@unique([studentId, period])`
  * menegakkan "1× per bulan"; timer 30 menit berwenang di server.
+ *
+ * SUSULAN: bila `period` (YYYY-MM) lampau diberikan, siswa mengerjakan Check Point bulan
+ * itu — HANYA bila barisnya sudah dibuka admin (status in_progress). Siswa tak pernah bisa
+ * membuat baris periode lampau sendiri. Skor tersimpan di bulan tersebut (memperbarui riwayat).
  */
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { sesiSiswa } from "@/server/student-auth";
-import {
-  buildCheckpoint,
-  nilaiCheckpoint,
-  untukKlien,
-  CHECKPOINT_CONFIG,
-  type BuiltCheckpoint,
-  type RawPassage,
-  type ClientCheckpoint,
-} from "@/lib/checkpoint";
-import { periodKey } from "@/lib/kelas";
-import { hashSeed } from "@/lib/rng";
+import { nilaiCheckpoint, untukKlien, CHECKPOINT_CONFIG, type BuiltCheckpoint, type ClientCheckpoint } from "@/lib/checkpoint";
+import { periodKey, periodeLampau } from "@/lib/kelas";
+import { dataBarisCheckpoint } from "@/server/checkpoint-core";
 
 const DURASI_DETIK = CHECKPOINT_CONFIG.DURASI_MENIT * 60;
 
-async function loadPassages(): Promise<RawPassage[]> {
-  const rows = await prisma.readingPassage.findMany({
-    where: { aktif: true, source: "CHECKPOINT" },
-    orderBy: { kode: "asc" },
-    include: { questions: { orderBy: { urutan: "asc" } } },
-  });
-  return rows.map((p) => ({
-    kode: p.kode,
-    tema: p.tema,
-    title: p.title,
-    text: p.text,
-    questions: p.questions.map((q) => ({
-      q: q.q,
-      options: JSON.parse(q.options) as string[],
-      answerIndex: q.answerIndex,
-    })),
-  }));
+/** Tentukan periode sasaran: default bulan berjalan; periode lampau = susulan (harus sah). */
+function pilihPeriode(periodInput?: string): { period: string; susulan: boolean } {
+  const now = periodKey();
+  if (!periodInput || periodInput === now) return { period: now, susulan: false };
+  if (!periodeLampau(periodInput)) throw new Error("Periode Check Point tidak sah.");
+  return { period: periodInput, susulan: true };
 }
 
 export interface MulaiHasil {
@@ -48,39 +33,27 @@ export interface MulaiHasil {
   sisaDetik?: number;
 }
 
-/** Mulai (atau lanjutkan) Check Point periode berjalan. Idempoten: satu attempt/bulan. */
-export async function mulaiCheckpoint(): Promise<MulaiHasil> {
+/**
+ * Mulai (atau lanjutkan) Check Point. `period` opsional = susulan bulan lampau.
+ * Idempoten: satu attempt per (siswa, bulan). Jam mundur dimulai saat siswa benar-benar
+ * memulai (startedAt masih sentinel "belum mulai" → disetel ke sekarang), bukan saat baris
+ * dibuat/dibuka admin — supaya susulan tak keburu habis waktunya.
+ */
+export async function mulaiCheckpoint(periodInput?: string): Promise<MulaiHasil> {
   const sesi = await sesiSiswa();
   if (!sesi) throw new Error("Sesi siswa tidak ditemukan. Silakan masuk kembali.");
-  const period = periodKey();
+  const { period, susulan } = pilihPeriode(periodInput);
   const where = { studentId_period: { studentId: sesi.studentId, period } };
 
   let row = await prisma.checkpointResult.findUnique({ where });
   if (row?.status === "submitted") return { status: "sudah" };
 
   if (!row) {
-    const passages = await loadPassages();
-    const fresh = buildCheckpoint({ period, studentKey: sesi.studentId, passages });
-    const totalLit = fresh.bacaan.reduce((s, p) => s + p.questions.length, 0);
+    // Susulan tak boleh membuat baris — hanya kerjakan yang sudah dibuka admin.
+    if (susulan) return { status: "sudah" };
     try {
       row = await prisma.checkpointResult.create({
-        data: {
-          studentId: sesi.studentId,
-          kelasLabel: sesi.kelasLabel,
-          period,
-          seed: hashSeed(sesi.studentId, period),
-          numerasi: 0,
-          literasi: 0,
-          total: 0,
-          benarNum: 0,
-          totalNum: fresh.soalNum.length,
-          benarLit: 0,
-          totalLit,
-          durasiDetik: 0,
-          waktuHabis: false,
-          payload: JSON.stringify(fresh),
-          status: "in_progress",
-        },
+        data: await dataBarisCheckpoint({ studentId: sesi.studentId, kelasLabel: sesi.kelasLabel, period }),
       });
     } catch {
       // balapan (dua tab mulai bersamaan): pakai baris yang sudah tersimpan.
@@ -91,8 +64,15 @@ export async function mulaiCheckpoint(): Promise<MulaiHasil> {
   if (!row?.payload) throw new Error("Gagal menyiapkan Check Point. Coba lagi.");
   if (row.status === "submitted") return { status: "sudah" };
 
+  // Jam mundur baru mulai saat siswa membuka pertama kali (startedAt masih di masa depan).
+  let started = row.startedAt;
+  if (started.getTime() > Date.now()) {
+    started = new Date();
+    await prisma.checkpointResult.update({ where, data: { startedAt: started } });
+  }
+
   const built = JSON.parse(row.payload) as BuiltCheckpoint;
-  const elapsed = Math.floor((Date.now() - row.startedAt.getTime()) / 1000);
+  const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
   return {
     status: "mengerjakan",
     soal: untukKlien(built),
@@ -111,20 +91,23 @@ export async function submitCheckpoint(input: {
   jawabNum: (string | null)[];
   jawabLit: (number | null)[][];
   waktuHabis?: boolean;
+  period?: string;
 }): Promise<SubmitHasil> {
   const sesi = await sesiSiswa();
   if (!sesi) throw new Error("Sesi siswa tidak ditemukan.");
-  const period = periodKey();
+  const { period } = pilihPeriode(input.period);
   const where = { studentId_period: { studentId: sesi.studentId, period } };
 
   const row = await prisma.checkpointResult.findUnique({ where });
   if (!row) return { ok: false, error: "Belum memulai Check Point." };
-  if (row.status === "submitted") return { ok: false, error: "Check Point bulan ini sudah dikumpulkan." };
+  if (row.status === "submitted") return { ok: false, error: "Check Point ini sudah dikumpulkan." };
   if (!row.payload) return { ok: false, error: "Data soal hilang. Mulai ulang." };
 
   const built = JSON.parse(row.payload) as BuiltCheckpoint;
   const skor = nilaiCheckpoint(built, input.jawabNum ?? [], input.jawabLit ?? []);
-  const elapsed = Math.floor((Date.now() - row.startedAt.getTime()) / 1000);
+  // Bila startedAt masih sentinel (belum sempat mulai) → anggap elapsed penuh.
+  const mulai = row.startedAt.getTime() > Date.now() ? Date.now() - DURASI_DETIK * 1000 : row.startedAt.getTime();
+  const elapsed = Math.floor((Date.now() - mulai) / 1000);
 
   await prisma.checkpointResult.update({
     where,

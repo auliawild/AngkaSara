@@ -3,7 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { tambahSiswa, editSiswa, hapusSiswa } from "@/server/students";
-import { bukaDiagnostikSkiba, bukaCheckpoint } from "@/server/kesempatan";
+import { bukaDiagnostikSkiba, bukaCheckpoint, bukaCheckpointSusulan } from "@/server/kesempatan";
 
 interface Row {
   id: string;
@@ -15,9 +15,15 @@ interface Row {
   diagTerpakai: number;
   /** Status Check Point periode berjalan: null = belum ada. */
   cpStatus: "in_progress" | "submitted" | null;
+  /** Status Check Point bulan-bulan lampau (period→status); tak ada entri = terlewat. */
+  cpLampau: Record<string, "in_progress" | "submitted">;
 }
 interface Opsi {
   id: string;
+  label: string;
+}
+interface BulanOpsi {
+  period: string;
   label: string;
 }
 
@@ -30,12 +36,14 @@ export default function SiswaTabel({
   kelasOpsi,
   diagMaks,
   periodeLabel,
+  bulanLampauOpsi,
 }: {
   kelas: Opsi;
   siswa: Row[];
   kelasOpsi: Opsi[];
   diagMaks: number;
   periodeLabel: string;
+  bulanLampauOpsi: BulanOpsi[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -224,6 +232,7 @@ export default function SiswaTabel({
                             row={s}
                             diagMaks={diagMaks}
                             periodeLabel={periodeLabel}
+                            bulanLampauOpsi={bulanLampauOpsi}
                             pending={pending}
                             onBukaDiag={() =>
                               jalankan(
@@ -236,6 +245,13 @@ export default function SiswaTabel({
                               jalankan(
                                 () => bukaCheckpoint(s.id),
                                 (res) => res.pesan ?? "Kesempatan Check Point dibuka.",
+                                () => setBukaId(null),
+                              )
+                            }
+                            onBukaSusulan={(period) =>
+                              jalankan(
+                                () => bukaCheckpointSusulan(s.id, period),
+                                (res) => res.pesan ?? "Susulan dibuka.",
                                 () => setBukaId(null),
                               )
                             }
@@ -336,16 +352,20 @@ function PanelKesempatan({
   row,
   diagMaks,
   periodeLabel,
+  bulanLampauOpsi,
   pending,
   onBukaDiag,
   onBukaCheckpoint,
+  onBukaSusulan,
 }: {
   row: Row;
   diagMaks: number;
   periodeLabel: string;
+  bulanLampauOpsi: BulanOpsi[];
   pending: boolean;
   onBukaDiag: () => void;
   onBukaCheckpoint: () => void;
+  onBukaSusulan: (period: string) => void;
 }) {
   const diagHabis = row.diagTerpakai > 0;
   const cpAda = row.cpStatus !== null;
@@ -360,7 +380,8 @@ function PanelKesempatan({
     "rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
-    <div className="grid gap-3 bg-amber-50/60 px-4 py-3 sm:grid-cols-2 dark:bg-amber-950/20">
+    <div className="flex flex-col gap-3 bg-amber-50/60 px-4 py-3 dark:bg-amber-950/20">
+      <div className="grid gap-3 sm:grid-cols-2">
       {/* Tes Diagnostik SKIBA */}
       <div className="flex flex-col gap-1.5 rounded-lg border border-amber-200/60 p-3 dark:border-amber-900/40">
         <div className="text-sm font-semibold">🧮 Tes Diagnostik SKIBA</div>
@@ -405,6 +426,48 @@ function PanelKesempatan({
           </button>
         </div>
         <p className="text-[11px] text-zinc-500">Menghapus hasil bulan ini agar siswa bisa mulai dari awal.</p>
+      </div>
+      </div>
+
+      {/* Check Point susulan (bulan lampau yang terlewat / ingin diulang) */}
+      <div className="flex flex-col gap-2 rounded-lg border border-amber-200/60 p-3 dark:border-amber-900/40">
+        <div className="text-sm font-semibold">📅 Check Point Susulan (bulan terlewat)</div>
+        <p className="text-[11px] text-zinc-500">
+          Buka Check Point bulan lampau agar siswa bisa mengerjakan susulan. Nilai tersimpan di bulan itu
+          (memperbarui riwayat &amp; raport). Bulan yang sudah ada nilainya akan ditimpa.
+        </p>
+        <div className="flex flex-col gap-1.5">
+          {bulanLampauOpsi.map((b) => {
+            const st = row.cpLampau[b.period] ?? null;
+            const terbuka = st === "in_progress";
+            const teks = terbuka ? "susulan terbuka" : st === "submitted" ? "sudah ada nilai" : "belum dikerjakan";
+            const warna = terbuka
+              ? "text-blue-600 dark:text-blue-400"
+              : st === "submitted"
+                ? "text-green-600"
+                : "text-amber-700 dark:text-amber-300";
+            return (
+              <div key={b.period} className="flex items-center justify-between gap-2 text-xs">
+                <span>
+                  {b.label} · <b className={warna}>{teks}</b>
+                </span>
+                <button
+                  disabled={pending || terbuka}
+                  onClick={() => {
+                    const konfirmasi = st === "submitted"
+                      ? `Buka susulan Check Point ${b.label} untuk ${row.nama}? Nilai lama bulan itu akan DITIMPA.`
+                      : `Buka susulan Check Point ${b.label} untuk ${row.nama}?`;
+                    if (!confirm(konfirmasi)) return;
+                    onBukaSusulan(b.period);
+                  }}
+                  className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {terbuka ? "Terbuka" : "Buka susulan"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

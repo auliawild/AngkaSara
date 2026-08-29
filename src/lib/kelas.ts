@@ -100,6 +100,33 @@ export function periodKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}`;
 }
 
+/** Label panjang periode "2026-07" → "Juli 2026". */
+export function labelPeriode(period: string): string {
+  const [th, bl] = period.split("-").map(Number);
+  return `${BULAN_PANJANG[(bl ?? 1) - 1] ?? ""} ${th ?? ""}`.trim();
+}
+
+/** true bila `period` (YYYY-MM) berada sebelum bulan berjalan (perbandingan string aman untuk format ini). */
+export function periodeLampau(period: string, now: Date = new Date()): boolean {
+  return /^\d{4}-\d{2}$/.test(period) && period < periodKey(now);
+}
+
+/** n periode terakhir SEBELUM bulan berjalan, terbaru dulu. now=2026-08,n=3 → ["2026-07","2026-06","2026-05"]. */
+export function daftarPeriodeLampau(now: Date = new Date(), n = 6): string[] {
+  const out: string[] = [];
+  let y = now.getFullYear();
+  let m = now.getMonth(); // 0-based bulan berjalan
+  for (let i = 0; i < n; i++) {
+    m -= 1;
+    if (m < 0) {
+      m = 11;
+      y -= 1;
+    }
+    out.push(`${y}-${p2(m + 1)}`);
+  }
+  return out;
+}
+
 export function isoWeek(d: Date): { tahun: number; minggu: number } {
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const day = t.getUTCDay() || 7;
